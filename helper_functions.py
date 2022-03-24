@@ -66,9 +66,9 @@ def get_configs(config_filename):
 
     up_state = nutrient_params['up_state']
     if up_state == 'repressed':
-        Ku2 = nutrient_params.getfloat('Ku2a_gluc')*init_vol_seg
+        Ku2 = nutrient_params.getfloat('Ku2a_gluc')*vol_grid
     else:
-        Ku2 = nutrient_params.getfloat('Ku2b_gluc')*init_vol_seg
+        Ku2 = nutrient_params.getfloat('Ku2b_gluc')*vol_grid
 
     # Save to a dictionary
     params_dict = {
