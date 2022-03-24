@@ -249,8 +249,16 @@ def initial_conditions_line(mycelia, num_segs, x_vals, y_vals):
     mycelia['angle'][1:num_total_segs:num_branches] = np.pi + np.random.normal(0, params['angle_sd'], (num_segs,1))
    
     # Length of each segments
+    # mycelia['seg_length'][:num_total_segs - num_branches] = params['sl']
+    # mycelia['seg_length'][num_total_segs - num_branches:num_total_segs] = 0.75*params['sl']
+    # mycelia['seg_vol'] =     mycelia['seg_length']*params['cross_area']
+    
+    # Length of each segments
     mycelia['seg_length'][:num_total_segs - num_branches] = params['sl']
-    mycelia['seg_length'][num_total_segs - num_branches:num_total_segs] = 0.75*params['sl']
+    if (num_total_segs - num_branches == 0):
+        mycelia['seg_length'][num_total_segs - num_branches:num_total_segs] = params['sl']
+    else:
+        mycelia['seg_length'][num_total_segs - num_branches:num_total_segs] = 0.75*params['sl']
     mycelia['seg_vol'] =     mycelia['seg_length']*params['cross_area']
     
     # Concentration of glucose in 0th segment of each branch
@@ -335,125 +343,162 @@ def external_grid():
 
 ##############################################################################
 
-def external_grid_patchy():
+def external_grid_patchy(set):
     # Define external domain grid
     scale_val = params['grid_scale_val']
     x_vals = np.arange(-params['sl']*scale_val, params['sl']*scale_val+params['dy'], params['dy'])
     y_vals = np.arange(-params['sl']*scale_val, params['sl']*scale_val+params['dy'], params['dy'])
     xe, ye = np.meshgrid(x_vals, y_vals)
     # breakpoint()
+    covered_grid = 0
     
     # Matrix for external nutrients; usnits are mmoles of glucose, not concentrations
     sub_e_gluc = 0.0*np.ones(xe.shape)
     sub_e_treha = 0.0*np.ones(xe.shape)
     
+    ## Note that for this type of initial condition, we want the nutrient 
+    ## distribution to cover roughly 30% of the domain. This 30% will be 
+    ## calculated using the number of grid points. 
+    ## So x_vals describes how many grid points on on the x-direction and 
+    ## similarly for y_vals.
+    ## Depending on how big each "focus" of the nutrient spots, we need to 
+    ## adjust its "radius" (M in the later part of the function).
     
-    # r1 = [150,
-    #  158,   192,   123,   238,   209,
-    # 279,   158,   101,    40,   180,   
-    # 226,   128,    36,    84,    53,
-    #  88,   132,   157,   137,   253,
-    # 154,   272,   187,   276,    77,
-    # 198,    91,   197,   203,    29,
-    #  81,    73,   195,   244,   106,
-    # 227,   198,    12,   177,   118,
-    # 264,    11,   139,   128,   138,
-    # 224,   100,   228,   141,    20]
+    ## For grid_scale_val = 80
+    if (set == 1):
+        ## Set 1
+        M = 9 # "radius" of each focus of nutrient spots
+        r1 = [round(len(x_vals)/2),   210,    51,    69,    43,
+        41,   201,   138,   131,    43,
+       198,   147,    88,   123,    99,
+        28,    64,    38,    51,    64,
+       102,    22,   209,   218,   118,
+       118,    85,   208,    92,    35,
+       182,    96,    64,    99,    32,
+        40,   217,   220,   137,    24,
+        62,    88,   191,    14,    20,
+        48,   153,   171,   153,   110,]
+        
+        r2 = [round(len(y_vals)/2),    76,   174,    52,   161,
+        51,    92,   148,   182,    29,
+       215,   181,   118,   106,   109,
+        78,   122,   123,   190,   185,
+       152,    94,   189,   128,    88,
+       217,   203,   131,   147,   140,
+        56,    77,   114,    61,   196,
+        54,    60,    48,    61,   106,
+        79,   213,   105,    51,   209,
+       226,   107,    35,    68,   101]
+    if (set == 2):
+        ## Set 2
+        M = 9
+        r1 = [round(len(x_vals)/2), 210,    38,   212,   150,
+        32,    72,   131,   222,   223,
+        45,   225,   222,   117,   187,
+        41,   103,   212,   185,   222,
+       155,    18,   198,   216,   160,
+       177,   174,    97,   155,    48,
+       166,    17,    71,    20,    31,
+       192,   164,    80,   220,    18,
+       107,    94,   179,   186,    51,
+       118,   108,   153,   167,   177]
+        
+        r2 = [round(len(y_vals)/2), 160,   155,    46,    36,
+       120,   222,    85,   139,    59,
+       176,    66,   122,   164,   207,
+       222,   131,    41,    43,    67,
+       196,    66,   190,    64,   215,
+        87,    53,    65,   146,   115,
+        88,   194,   139,   131,   213,
+        73,   177,   177,    94,   135,
+        27,    22,   127,   182,   216,
+        39,   136,   114,    13,    85]
+    if (set == 3):
+        ## Set 3
+        M = 9
+        r1 = [round(len(x_vals)/2), 186,    79,   127,    47,
+       143,    68,   155,   162,   175,
+       110,    29,    61,   212,    44,
+       193,   129,   230,    27,   108,
+        34,   223,    11,   181,   191,
+       202,    29,    98,    67,   187,
+       105,   211,    50,    68,    42,
+        40,   202,   138,   132,    42,
+       199,   147,    88,   123,    99,
+        27,    63,    37,    51,    63]
+        r2 = [round(len(y_vals)/2), 21,   210,   219,   118,
+       118,    85,   209,    92,    35,
+       182,    96,    63,    99,    31,
+        39,   218,   221,   137,    23,
+        62,    88,   191,    13,    20,
+        47,   153,   172,   153,   110,
+       131,    75,   175,    52,   162,
+        51,    91,   148,   182,    28,
+       215,   181,   118,   106,   109,
+        78,   122,   123,   191,   186,]
     
-    # r2 = [150,
-    #  59,   210,   142,    53,   105,
-    # 179,    64,   215,    78,   265,
-    #  85,   223,    63,    90,    36,
-    # 170,   200,   162,   128,   189,
-    # 190,   199,   187,   272,    68,
-    # 207,    76,    44,   179,   135,
-    # 138,   194,   224,   108,   194,
-    # 126,   244,   241,    82,   180,
-    # 172,   160,   251,    84,    99,
-    #  44,   271,   189,   143,   188]
+    if (set == 4):
+        ## Set 4
+        M = 4
+        r1 = [round(len(x_vals)/2),  156 ,   48 ,   75 ,  220 ,   77,    17 ,  152 ,   66 ,  210,
+           161 ,  125 ,   96 ,  105 ,  213 ,  165 ,  134 ,   93,    74 ,  204,
+            19 ,  225 ,  194 ,   13 ,   22 ,  157 ,  205 ,   52,   146 ,  191,
+            26 ,  153 ,  188 ,  227 ,  173 ,  129 ,  158 ,  105,    69 ,   68,
+           125 ,  187 ,   23 ,   47 ,   69 ,  164 ,   52 ,  117,   192 ,  141,
+            31 ,  110 ,   98 ,   33 ,  103 ,  157 ,   92 ,   37,   227 ,   15,
+           191 ,  106 ,  126 ,   92 ,  131 ,   49 ,  112 ,  140,   171 ,  104,
+           191 ,  192 ,  102 ,   54 ,  218 ,   38 ,  227 ,   60,    86 ,   79,
+           170 ,   28 ,  155 ,  118 ,  102 ,  231 ,   45 ,   95,   139 ,   46,
+            43 ,   39 ,  149 ,   85 ,  227 ,   48 ,  199 ,  139,    34 ,   50]
+        r2 = [round(len(y_vals)/2), 182,   124,    66,   212,    49,    69,   153,   111,
+            31,   155,   104,   219,    60,    10,   170,   179,   160,   156,
+           142,   100,    30,   151,   158,   112,   115,    52,   151,   180,
+           114,   191,    69,   222,   197,   104,    44,    74,   219,    87,
+           164,   169,    44,    63,    86,   112,    85,    30,    56,   156,
+           165,   224,    72,   159,   182,   180,   144,   137,   167,   102,
+           151,   127,   107,    74,   159,    81,    52,   161,    62,   196,
+            17,    82,   126,   158,    11,   183,   173,   131,    36,   194,
+            25,    33,   111,   164,   143,   114,    64,   104,   144,    67,
+            81,   145,   203,    25,    95,    18,   213,   152,   109,   146]
     
-   #  for i in range(len(r1)):
-   #      center_x = r1[i]
-   #      center_y = r2[i]
-   #      for j in range(12):
-   #          for k in range(12):
-   #              sub_e_gluc[center_x+j,center_y+k] = params['init_sub_e_gluc']
-   #              sub_e_gluc[center_x-j,center_y-k] = params['init_sub_e_gluc']
-   
-    r1 = [31,
-           134,
-           113,
-            65,
-           112,
-            95,
-            98,
-           106,
-            95,
-            46,
-            23,
-           100,
-           133,
-            67,
-           109,
-            35,
-            55,
-            46,
-            26,
-           134,
-            86,
-           107,
-            76,
-            75,
-            81,
-            30,
-           119,
-            90,
-            56,
-            86]
+    if (set == 5):
+        ## Set 5
+        M = 4
+        r1 = [round(len(x_vals)/2), 99 ,  164 ,   87 ,  173 ,  192,   185 ,  124,   128,
+           130 ,  153 ,  109 ,   31 ,   43 ,   97 ,  105 ,  220 ,  205 ,   30,
+           202 ,  130 ,   91 ,  126 ,  140 ,  161 ,  206 ,   82 ,  140 ,   35,
+            69 ,  169 ,  179 ,  127 ,   68 ,  166 ,   96 ,  158 ,   44 ,   40,
+            80 ,  125 ,  149 ,  200 ,   20 ,  108 ,  180 ,  107 ,   54 ,  160,
+            36 ,  230 ,  181 ,  117 ,  177 ,   14 ,   98 ,  194 ,  100 ,  119,
+           218 ,   58 ,  216 ,   97 ,   64 ,   83 ,  189 ,  180 ,  175 ,   52,
+           153 ,   33 ,  225 ,  158 ,  108 ,  104 ,  177 ,   47 ,  192 ,  119,
+           116 ,   34 ,   52 ,  174 ,  162 ,   70 ,   93 ,  200 ,  185 ,   43,
+           151 ,   24 ,   41 ,  125 ,   89 ,   54 ,   58 ,  229 ,   80 ,   22]
+        r2 = [round(len(y_vals)/2),  173 ,  180 ,  132  ,  42  ,  37 ,  219 ,  173,    40,
+           134,   229,   140,   138,   149,    52,   118,    28,    24,    17,
+           215,   127,    65,   215,    17,    19,   199,    33,   200,   218,
+           164,   116,   157,   138,   146,   150,   203,    41,   217,    77,
+           139,   187,    28,    14,    90,    72,    70,    47,   228,    75,
+           190,    60,   148,    37,    21,   129,    56,   147,   200,    84,
+           204,   120,   156,   201,   118,   164,   135,   137,   184,   113,
+           229,   209,   171,   117,    53,   120,   152,    22,   123,   153,
+            10,   137,   207,   197,    37,   128,   102,   216,    49,    16,
+           201,   197,   227,    56,    55,   108,    56,   171,    98,   196]
      
-    r2 = [48,
-           107,
-            84,
-            18,
-           111,
-            28,
-            71,
-            54,
-           113,
-            79,
-            88,
-            95,
-           107,
-            22,
-           128,
-           139,
-            68,
-           134,
-           110,
-           122,
-           113,
-           128,
-            45,
-            74,
-            85,
-            30,
-            27,
-           132,
-            74,
-           126]
     
-    # r1 = [38]
-    # r2 = [38]
-     
     for i in range(len(r1)):
         center_x = r1[i]
         center_y = np.flip(r2[i])
-        for j in range(5):
-            for k in range(5):
+        for j in range(M):
+            for k in range(M):
                 sub_e_gluc[center_x+j,center_y+k] = params['init_sub_e_gluc']
                 sub_e_gluc[center_x-j,center_y-k] = params['init_sub_e_gluc']
                 sub_e_gluc[center_x+j,center_y-k] = params['init_sub_e_gluc']
                 sub_e_gluc[center_x-j,center_y+k] = params['init_sub_e_gluc']
+                covered_grid += 1
+    
+    print('The number of grid points covered : ', covered_grid)
+    print('Total number of grid points in the domain : ', len(x_vals)*len(y_vals))
                 
     return x_vals, y_vals, sub_e_gluc, sub_e_treha
             

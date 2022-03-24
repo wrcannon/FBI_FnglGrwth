@@ -66,12 +66,9 @@ def get_configs(config_filename):
 
     up_state = nutrient_params['up_state']
     if up_state == 'repressed':
-        #Ku2 = nutrient_params.getfloat('Ku2a_gluc')*init_vol_seg
-        Ku2 = nutrient_params.getfloat('Ku2a_gluc')*vol_grid
-
+        Ku2 = nutrient_params.getfloat('Ku2a_gluc')*init_vol_seg
     else:
-        #Ku2 = nutrient_params.getfloat('Ku2b_gluc')*init_vol_seg
-        Ku2 = nutrient_params.getfloat('Ku2b_gluc')*vol_grid
+        Ku2 = nutrient_params.getfloat('Ku2b_gluc')*init_vol_seg
 
     # Save to a dictionary
     params_dict = {
@@ -124,11 +121,10 @@ def get_configs(config_filename):
         #'kc1_gluc' : nutrient_params.getfloat('kc1_gluc'),
         #'Kc2_gluc' : nutrient_params.getfloat('Kc2_gluc'),
         'kc1_gluc' : nutrient_params.getfloat('ku1_gluc'),
-        'Kc2_gluc' : Ku2*init_vol_seg/vol_grid,
+        'Kc2_gluc' : Ku2,
         'yield_c' : nutrient_params.getfloat('yield_c'),
 
         'kg1_wall' : nutrient_params.getfloat('kg1_wall'),
-        'vel_wall' : nutrient_params.getfloat('kg1_wall'),
         # 'Kg2_wall' : nutrient_params.getfloat('Kg2_wall')*vol_seg,
         'Kg2_wall' : nutrient_params.getfloat('Kg2_wall'),
         'yield_g' : nutrient_params.getfloat('yield_g'),
@@ -140,6 +136,7 @@ def get_configs(config_filename):
 
     if not('yield_c_in_mmoles' in params_dict):
     	params_dict['yield_c_in_mmoles'] = params_dict['yield_c']*params_dict['mw_glucose']/params_dict['mw_cw']
+
     use_original = 0
 
     if(use_original != 1):
@@ -153,6 +150,8 @@ def get_configs(config_filename):
         params_dict['yield_in_moles'] = params_dict['yield_c']*params_dict['mw_glucose']/params_dict['mw_cw']
         #params_dict['kc1_gluc'] =  max_moles_cw_per_time/yield_in_moles
         #params_dict['ku1_gluc'] = params_dict['kc1_gluc']
+        
+        params_dict['vel_wall'] = params_dict['kg1_wall']
 
 
     return params_dict, config
@@ -181,9 +180,8 @@ def get_filepath(params):
     #                                                         params['sl'],
     #                                                         params['dt'],
     #                                                         params['final_time'])
-    # folder_string = "oldD2Tip_Fus_tipRe_brRate1e9_resBr4_noBkDiffLowGluc2_bkPatchy_Trsloc_4init"
-    # folder_string = 'recalibration_02242022'
-    folder_string = "noFusion_tipRel_homogenousEnv_convert"
+    folder_string = "oldD2Tip_Fus_tipRe_brRate2e8_resBr4_noBkDiff_bkPatchy2_"
+    # folder_string = "calibration"
     # file_string = "{}_b={:.3e}_ieg={}_deg={}_iig={:.3e}_dig={}_vw={}_kyu={},{:.3e},{}_kyc={:.3e},{:.3e},{}_kyg={},{:.3e},{}".format(
     #     folder_string,
     #     params['branch_rate'],
@@ -194,9 +192,9 @@ def get_filepath(params):
     #     params['ku1_gluc'], params['Ku2_gluc'], params['yield_u'],
     #     params['kc1_gluc'], params['Kc2_gluc'], params['yield_c'],
     #     params['kg1_wall'], params['Kg2_wall'], params['yield_g'])
-    # file_string = "oldD2Tip_Fus_tipRe_brRate1e9_resBr4_noBkDiffLowGluc2_bkPatchy_Trsloc_4init"
-    # file_string = "recalibration_02242022"
-    file_string = "noFusion_tipRel_homogenousEnv"
+    file_string = "oldD2Tip_Fus_tipRe_brRate2e8_resBr4_noBkDiff_bkPatchy2_"
+    # file_string = "calibration"
+    #file_string = "univSecr_metTransp_brRate5e8_NObkDiff_oldD2Tip_patchyExt_Fus_gridScaleVal80"
     return folder_string, file_string
 
 
@@ -226,15 +224,12 @@ def plot_fungus(mycelia, num_total_segs, curr_time, folder_string, param_string,
 
     """
     # cur_len = len(hy)
-    si_conc = mycelia['cw_i']/mycelia['seg_vol'] *1.0e12
-    idx_to_display = np.intersect1d(np.where(mycelia['branch_id'][:num_total_segs]>-1)[0], np.where(np.isfinite(si_conc))[0])
-    si = si_conc[idx_to_display].flatten()
+    idx_to_display = np.where(mycelia['branch_id'][:num_total_segs]>-1)[0]
     x1 = mycelia['xy1'][idx_to_display, 0].tolist()
     x2 = mycelia['xy2'][idx_to_display, 0].tolist()
     y1 = mycelia['xy1'][idx_to_display, 1].tolist()
     y2 = mycelia['xy2'][idx_to_display, 1].tolist()
-
-
+    si = mycelia['cw_i'][idx_to_display].flatten()
     # x1 = mycelia['xy1'][:num_total_segs, 0].tolist()
     # x2 = mycelia['xy2'][:num_total_segs, 0].tolist()
     # y1 = mycelia['xy1'][:num_total_segs, 1].tolist()
@@ -272,7 +267,7 @@ def plot_fungus(mycelia, num_total_segs, curr_time, folder_string, param_string,
     # Colorbar
     ax.add_collection(lc)
     fc = fig.colorbar(lc)
-    fc.set_label('Cell Wall Components\n Log Conc. (Molar)')
+    fc.set_label('Internal Cell Wall (for growth) Concentration')
     fc.outline.set_visible(False)
 
     # Convert units
@@ -291,9 +286,7 @@ def plot_fungus(mycelia, num_total_segs, curr_time, folder_string, param_string,
     # ax.set_xlabel('dm')
     ax.set_ylabel('{}'.format(params['plot_units_space']))
     ax.set_xlabel('{}'.format(params['plot_units_space']))
-    #ax.set_title('Mycelia Network \nTime = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
-    ax.set_title('Time = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
-
+    ax.set_title('Mycelia Network \nTime = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
     ax.axis('equal')
     ax.margins(0.1)
     # breakpoint()
@@ -335,26 +328,21 @@ def plot_fungus_gluc(mycelia, num_total_segs, curr_time, folder_string, param_st
 
     """
     # cur_len = len(hy)
-    si_conc = mycelia['gluc_i']/mycelia['seg_vol'] *1.0e12
-    idx_to_display = np.intersect1d(np.where(mycelia['branch_id'][:num_total_segs]>-1)[0], np.where(np.isfinite(si_conc))[0])
-    si = si_conc[idx_to_display].flatten()
+    idx_to_display = np.where(mycelia['branch_id'][:num_total_segs]>-1)[0]
     x1 = mycelia['xy1'][idx_to_display, 0].tolist()
     x2 = mycelia['xy2'][idx_to_display, 0].tolist()
     y1 = mycelia['xy1'][idx_to_display, 1].tolist()
     y2 = mycelia['xy2'][idx_to_display, 1].tolist()
- 
- 
-    
-    #si = mycelia['gluc_i'][idx_to_display].flatten()
+    si = mycelia['gluc_i'][idx_to_display].flatten()
     # x1 = mycelia['xy1'][:num_total_segs, 0].tolist()
     # x2 = mycelia['xy2'][:num_total_segs, 0].tolist()
     # y1 = mycelia['xy1'][:num_total_segs, 1].tolist()
     # y2 = mycelia['xy2'][:num_total_segs, 1].tolist()
     # si = mycelia['gluc_i'][:num_total_segs].flatten()
 
-    if any(si < 1.0e-9):
-        #min_value = min(si[(si > 1.0e-9)])
-        si[np.where(si < 1.0e-9)] = 1.0e-09
+    if any(si ==0.0):
+        min_value = min(si[(si > 0)])
+        si[np.where(si == 0.0)] = min_value /10
     si = np.log10(si)
 
     segments = []
@@ -380,7 +368,7 @@ def plot_fungus_gluc(mycelia, num_total_segs, curr_time, folder_string, param_st
     # Colorbar
     ax.add_collection(lc)
     fc = fig.colorbar(lc)
-    fc.set_label('Glucose\n Log Conc. (Molar)')
+    fc.set_label('Internal Glucose Concentration')
     fc.outline.set_visible(False)
 
     # Convert units
@@ -399,9 +387,7 @@ def plot_fungus_gluc(mycelia, num_total_segs, curr_time, folder_string, param_st
     # ax.set_xlabel('dm')
     ax.set_ylabel('{}'.format(params['plot_units_space']))
     ax.set_xlabel('{}'.format(params['plot_units_space']))
-    #ax.set_title('Mycelia Network \nTime = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
-    ax.set_title('Time = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
-
+    ax.set_title('Mycelia Network \nTime = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
     ax.axis('equal')
     ax.margins(0.1)
     # breakpoint()
@@ -496,9 +482,7 @@ def plot_fungus_generic(mycelia, num_total_segs, curr_time, folder_string, param
     # ax.set_xlabel('dm')
     ax.set_ylabel('{}'.format(params['plot_units_space']))
     ax.set_xlabel('{}'.format(params['plot_units_space']))
-    #ax.set_title('Mycelia Network \nTime = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
-    ax.set_title('Time = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
-
+    ax.set_title('Mycelia Network \nTime = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
     ax.axis('equal')
     ax.margins(0.1)
     # breakpoint()
@@ -538,24 +522,22 @@ def plot_fungus_treha(mycelia, num_total_segs, curr_time, folder_string, param_s
 
     """
     # cur_len = len(hy)
-    si_conc = mycelia['treha_i']/mycelia['seg_vol'] *1.0e12
-    idx_to_display = np.intersect1d(np.where(mycelia['branch_id'][:num_total_segs]>-1)[0], np.where(np.isfinite(si_conc))[0])
-    si = si_conc[idx_to_display].flatten()
+    idx_to_display = np.where(mycelia['branch_id'][:num_total_segs]>-1)[0]
     x1 = mycelia['xy1'][idx_to_display, 0].tolist()
     x2 = mycelia['xy2'][idx_to_display, 0].tolist()
     y1 = mycelia['xy1'][idx_to_display, 1].tolist()
     y2 = mycelia['xy2'][idx_to_display, 1].tolist()
-
+    si = mycelia['treha_i'][idx_to_display].flatten()
     # x1 = mycelia['xy1'][:num_total_segs, 0].tolist()
     # x2 = mycelia['xy2'][:num_total_segs, 0].tolist()
     # y1 = mycelia['xy1'][:num_total_segs, 1].tolist()
     # y2 = mycelia['xy2'][:num_total_segs, 1].tolist()
     # si = mycelia['gluc_i'][:num_total_segs].flatten()
 
-    if any(si < 1.0e-9):
-        #min_value = min(si[(si > 1.0e-9)])
-        si[np.where(si < 1.0e-9)] = 1.0e-09
-    si = np.log10(si)
+    # if any(si ==0.0):
+        # min_value = min(si[(si > 0)])
+        # si[np.where(si == 0.0)] = min_value /10
+    # si = np.log10(si)
 
     segments = []
     for xi1, yi1, xi2, yi2 in zip(x1, y1, x2, y2):
@@ -580,7 +562,7 @@ def plot_fungus_treha(mycelia, num_total_segs, curr_time, folder_string, param_s
     # Colorbar
     ax.add_collection(lc)
     fc = fig.colorbar(lc)
-    fc.set_label('Trehalose\n Log Conc. (Molar)')
+    fc.set_label('Internal Trehalose Concentration')
     fc.outline.set_visible(False)
 
     # Convert units
@@ -599,8 +581,7 @@ def plot_fungus_treha(mycelia, num_total_segs, curr_time, folder_string, param_s
     # ax.set_xlabel('dm')
     ax.set_ylabel('{}'.format(params['plot_units_space']))
     ax.set_xlabel('{}'.format(params['plot_units_space']))
-    #ax.set_title('Mycelia Network \nTime = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
-    ax.set_title('Time = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
+    ax.set_title('Mycelia Network \nTime = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
     ax.axis('equal')
     ax.margins(0.1)
     # breakpoint()
@@ -723,15 +704,12 @@ def plot_externalsub(sub_e, yticks, yticklabels, curr_time, sub_e_max, plot_type
     Plot external nutrient concentration.
 
     """
-    # Convert to molar quantities for display
-    sub_e = np.log(sub_e/params['vol_grid']*1e12) 
-    sub_e_max = np.max(sub_e)
-    
+
     # For the orange-blue color map
-    top = cm.get_cmap('Oranges_r', 256) # r means reversed version
-    bottom = cm.get_cmap('Blues', 256)# combine it all
-    newcolors = np.vstack((top(np.linspace(0, 1, 256)),
-                           bottom(np.linspace(0, 1, 256))))# create a new colormaps with a name of OrangeBlue
+    top = cm.get_cmap('Oranges_r', 128) # r means reversed version
+    bottom = cm.get_cmap('Blues', 128)# combine it all
+    newcolors = np.vstack((top(np.linspace(0, 1, 128)),
+                           bottom(np.linspace(0, 1, 128))))# create a new colormaps with a name of OrangeBlue
     orange_blue = ListedColormap(newcolors, name='OrangeBlue')
 
     # Convert units
@@ -746,14 +724,14 @@ def plot_externalsub(sub_e, yticks, yticklabels, curr_time, sub_e_max, plot_type
     # breakpoint()
     # Plot
     if plot_type == 'Se':
-        ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmax=sub_e_max)#, xticklabels=yticklabels, yticklabels=yticklabels)
+        ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmin=0, vmax=sub_e_max)#, xticklabels=yticklabels, yticklabels=yticklabels)
     # elif plot_type == 'Ce':
     #     ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmin=0, xticklabels=yticklabels, yticklabels=yticklabels)
     # breakpoint()
     ax.set_yticks(yticks)
     ax.set_xticks(yticks)
     if plot_type == 'Se':
-        ax.collections[0].colorbar.set_label("External Glucose\n Log Conc. (Molar)")
+        ax.collections[0].colorbar.set_label("External Glucose Concentration")
         ax.set_title('External Domain \nTime = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
     elif plot_type == 'Ce':
         ax.collections[0].colorbar.set_label("Chemical Inhibitor Concentration")
@@ -762,7 +740,7 @@ def plot_externalsub(sub_e, yticks, yticklabels, curr_time, sub_e_max, plot_type
     ax.set_ylabel('{}'.format(params['plot_units_space']))
     ax.set_xlabel('{}'.format(params['plot_units_space']))
     ax.invert_yaxis()
-    #ax.axis('equal')
+    ax.axis('equal')
     ax.margins(0.1)
     # ax.set(yticklabels=[])
     # ax.set(xticklabels=[])
@@ -804,18 +782,12 @@ def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plo
     Plot external nutrient concentration.
 
     """
-    # Convert to molar quantities for display
-    sub_e = np.log(sub_e/params['vol_grid']*1e12) 
-    sub_e[np.where(np.isinf(sub_e))] = np.min(sub_e[np.where(np.isfinite(sub_e))])-1
-    
-
-    sub_e_max = np.max(sub_e)
 
     # For the orange-blue color map
-    top = cm.get_cmap('Oranges_r', 256) # r means reversed version
-    bottom = cm.get_cmap('Blues', 256)# combine it all
-    newcolors = np.vstack((top(np.linspace(0, 1, 256)),
-                           bottom(np.linspace(0, 1, 256))))# create a new colormaps with a name of OrangeBlue
+    top = cm.get_cmap('Oranges_r', 128) # r means reversed version
+    bottom = cm.get_cmap('Blues', 128)# combine it all
+    newcolors = np.vstack((top(np.linspace(0, 1, 128)),
+                           bottom(np.linspace(0, 1, 128))))# create a new colormaps with a name of OrangeBlue
     orange_blue = ListedColormap(newcolors, name='OrangeBlue')
 
     # Convert units
@@ -830,15 +802,14 @@ def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plo
     # breakpoint()
     # Plot
     if plot_type == 'Se':
-        #ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmax=sub_e_max)#, xticklabels=yticklabels, yticklabels=yticklabels)
-        ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmax=sub_e_max)#, xticklabels=yticklabels, yticklabels=yticklabels)
+        ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmin=0, vmax=sub_e_max)#, xticklabels=yticklabels, yticklabels=yticklabels)
     # elif plot_type == 'Ce':
     #     ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmin=0, xticklabels=yticklabels, yticklabels=yticklabels)
     # breakpoint()
     ax.set_yticks(yticks)
     ax.set_xticks(yticks)
     if plot_type == 'Se':
-        ax.collections[0].colorbar.set_label("External Trehalose\n Log Conc. (Molar)")
+        ax.collections[0].colorbar.set_label("External Trehalose Concentration")
         ax.set_title('External Domain \nTime = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
     elif plot_type == 'Ce':
         ax.collections[0].colorbar.set_label("Chemical Inhibitor Concentration")
@@ -847,7 +818,7 @@ def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plo
     ax.set_ylabel('{}'.format(params['plot_units_space']))
     ax.set_xlabel('{}'.format(params['plot_units_space']))
     ax.invert_yaxis()
-    #ax.axis('equal')
+    ax.axis('equal')
     ax.margins(0.1)
     # ax.set(yticklabels=[])
     # ax.set(xticklabels=[])
@@ -861,7 +832,7 @@ def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plo
                                                                         run)
     fig = ax.get_figure()
     fig.savefig(fig_name)
-    plt.close(fig)
+    plt.close()
 # ----------------------------------------------------------------------------
 
 def plot_stat(count_times, count_stat, stat_type, folder_string, param_string, params, run):
@@ -882,7 +853,7 @@ def plot_stat(count_times, count_stat, stat_type, folder_string, param_string, p
     ax.set_xlabel('Time ({})'.format(params['plot_units_time']))
     ax.set_ylabel(stat_type)
     sns.despine()
-    #plt.show()
+    plt.show()
 
     if stat_type == 'Num. of Branches':
         key_word = 'stat_b'
@@ -992,6 +963,7 @@ def plot_min_treha_annulus(count_stat,max_count_stat, stat_type, folder_string, 
                                                       current_time,
                                                       run)
     fig.savefig(fig_name)
+    plt.close()
     
 # ----------------------------------------------------------------------------
 
@@ -1063,8 +1035,7 @@ def plot_biomassdensity(radius_i, biomass_density, curr_time):
     ax1.set_xlabel('Distance To Center (mm)')
     ax1.set_ylabel('Biomass Density')
     sns.despine()
-    #plt.show()
-    plt.close()
+    plt.show()
 
 
 def plot_tipdensity(radius_i, tip_density, curr_time):
@@ -1097,8 +1068,7 @@ def plot_tipdensity(radius_i, tip_density, curr_time):
     ax2.set_xlabel('Distance To Center (mm)')
     ax2.set_ylabel('Hyphal Tip Density')
     sns.despine()
-    #plt.show()
-    plt.close()
+    plt.show()
 
 ##############################################################################
 
@@ -1114,13 +1084,14 @@ def plot_hist(mycelia, curr_time,num_total_segs, param_string, params, run):
         plot_time = curr_time
     fig, ax = plt.subplots()
     # breakpoint()
-    ax.hist(mycelia['dist_from_center'][:num_total_segs], range=[0, 1000], bins=100)
+    ax.hist(mycelia['dist_from_center'][:num_total_segs], range=[0, 2000], bins=100)
     fig_name = "Results/{}/Run{}/{}_{}_{}.png".format(param_string,
                                                       run,
                                                       curr_time,
                                                       param_string,                                                    
                                                       run)
     fig.savefig(fig_name)
+    plt.close()
     
 ##############################################################################
 
@@ -1133,6 +1104,7 @@ def plot_density_annulus(density_per_unit_annulus, num_total_segs, param_string,
                                                       param_string,                                                    
                                                       run)
     fig.savefig(fig_name)
+    plt.close()
     
 ##############################################################################
 
@@ -1146,3 +1118,4 @@ def plot_treha_conc_annulus(avg_treha_annulus, num_total_segs, param_string, cur
                                                       current_time,
                                                       run)
     fig.savefig(fig_name)
+    plt.close()

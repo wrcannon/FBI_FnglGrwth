@@ -597,7 +597,9 @@ def split_segment(mycelia, num_total_segs, x_vals, y_vals, isCalibration, dist2T
 # ----------------------------------------------------------------------------
 
 # Extension - Main function for elongation
-def extension(mycelia, num_total_segs, dtt, x_vals, y_vals, isCalibration, dist2Tip_new, fungal_fusion):
+def extension(mycelia, num_total_segs, dtt, x_vals, y_vals, 
+              isCalibration, dist2Tip_new, fungal_fusion,
+              chance_to_fuse):
     """
     Parameters
     ----------
@@ -664,7 +666,7 @@ def extension(mycelia, num_total_segs, dtt, x_vals, y_vals, isCalibration, dist2
         # Check for fusion
         if (fungal_fusion == 1):
             for idx in tip_idxs:
-                mycelia = anastomosis(mycelia, idx, num_total_segs)
+                mycelia = anastomosis(mycelia, idx, num_total_segs, chance_to_fuse)
             if(np.any(np.isnan(mycelia['cw_i']))):
                 breakpoint()
 ##############################################################################
@@ -688,7 +690,9 @@ def extension(mycelia, num_total_segs, dtt, x_vals, y_vals, isCalibration, dist2
 # ----------------------------------------------------------------------------
 
 # Branching - Main function for new branches
-def branching(mycelia, num_total_segs, dtt, x_vals, y_vals, isCalibration, dist2Tip_new, fungal_fusion, restrictBranching):
+def branching(mycelia, num_total_segs, dtt, x_vals, y_vals, 
+              isCalibration, dist2Tip_new, fungal_fusion, restrictBranching,
+              chance_to_fuse):
     """
     Parameters
     ----------
@@ -819,7 +823,7 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals, isCalibration, dist2
             
             if fungal_fusion == 1:
                 for idx in new_tips:
-                    mycelia = anastomosis(mycelia, idx, num_total_segs)
+                    mycelia = anastomosis(mycelia, idx, num_total_segs, chance_to_fuse)
 
             # Update distance to tip
             if dist2Tip_new == 1:
@@ -1043,7 +1047,7 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals, isCalibration, dist2
 
 # ----------------------------------------------------------------------------
 
-def anastomosis(mycelia, idx, num_total_segs):
+def anastomosis(mycelia, idx, num_total_segs, chance_to_fuse):
     """
     Parameters
     ----------
@@ -1135,11 +1139,11 @@ def anastomosis(mycelia, idx, num_total_segs):
                         # breakpoint()
                    
                     prob = np.random.uniform(0, 1, 1)
-                    if (prob > 0.25):
-                        print('Intersection found but fails probability check!')
+                    if (prob > chance_to_fuse):
+                        # print('Intersection found but fails probability check!')
                         continue
-                    else:
-                         print('Intersection found')
+                    # else:
+                         # print('Intersection found')
                     # If the intersection is with a bypassed segment, the intersection
                     # is re-establish with a neighbor of the bypassed segment.
                     if mycelia['bypass'][target_idx] == True:

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+##!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Created on Tue Sep 15 14:32:59 2020
@@ -8,7 +8,6 @@ Created on Tue Sep 15 14:32:59 2020
 @                        cannot create any new branches if it has not already done so.
 """
 
-
 import csv
 import numpy as np
 # import pandas as pd
@@ -17,12 +16,13 @@ import time
 import pickle
 from joblib import Parallel, delayed
 import multiprocessing
-num_cores = multiprocessing.cpu_count()
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-#cwd_path ='/Users/libra/Desktop/FBI_FungalGrowth-Bill1'
-cwd_path ='/Users/d3k137/docs/projects/boltzmann/code/06212017/run/fungal_growth/kevin-bill/FBI_FungalGrowth'
+num_cores = multiprocessing.cpu_count()
+
+# cwd_path ='/Users/libra/Desktop/FBI_FungalGrowth-Bill1'
+cwd_path ='/Users/d3k137/docs/projects/boltzmann/code/06212017/run/fungal_growth/kevin-bill2/FBI_FungalGrowth-Bill1'
 os.chdir(cwd_path)
 
 import helper_functions as hf
@@ -70,11 +70,11 @@ def driver_singleNutrient(run):
     print('dist2Tip_new : ', dist2Tip_new)
     
     # Is the background environment diffusion-capable? 1 = YES, 0 = NO
-    backDiff = 1
+    backDiff = 0
     print('backDiff : ', backDiff)
     
     # Is fungal fusion (anastomosis) active? 1 = YES, 0 = NO
-    fungal_fusion = 0
+    fungal_fusion = 1
     print('fungal_fusion : ', fungal_fusion)
     
     # Is chemoattractant released at the tip only? 1 = YES, 0 = NO
@@ -92,17 +92,25 @@ def driver_singleNutrient(run):
     
     # Is the branching restricted to N segment away from the tip?
     # 0 = Unbiased branching
+    # 1 = No branching
     # N = 2,3,... branching only occur N segment away from the tip.
     # Why N = 2 would be the minimum? Because in the current setup, a segment
     # directly behind the tip is not enclosed by two septa hence not eligible
     # for branching.
-    restrictBranching = 0
+    restrictBranching = 2
     print('restrictBranching : ', restrictBranching)
     
     # Is the initial background environment with 'patchy' nutrient distribution?
     # 1 = YES, 0 = NO
     isPatchyExtEnvironment = 0
     print('isPatchyExtEnvironment : ', isPatchyExtEnvironment)
+    if (isPatchyExtEnvironment == 1):
+        ## There are currently 5 presets of the non-homogeneous randomized
+        ## nutrient distribution. setBackground = 1,2,3,4,or 5 will determine 
+        ## the set to use.
+        ## setBackground = 1,2,3 have 50 nutrient foci
+        ## setBackground = 4,5 have 100 nutrient foci
+        setBackground = 2
     
     # Is the cell wall convection (active transport) scaled by local metabolism 
     # activity? 1 = YES, 0 = NO
@@ -119,6 +127,10 @@ def driver_singleNutrient(run):
     isConvectDependOnMetabo_treha = 1
     print('isConvectDependOnMetabo_treha : ', isConvectDependOnMetabo_treha)
     
+    # What is the probability for fusion to be established?
+    chance_to_fuse = 0.25
+    print('The probability for fungal fusion is set to : ', chance_to_fuse)
+    
     ###########################################################################
     ###########################################################################
     ###########################################################################
@@ -130,7 +142,7 @@ def driver_singleNutrient(run):
     if (isPatchyExtEnvironment == 0):
         x_vals, y_vals, sub_e_gluc, sub_e_treha = sf.external_grid()
     else:
-        x_vals, y_vals, sub_e_gluc, sub_e_treha = sf.external_grid_patchy()
+        x_vals, y_vals, sub_e_gluc, sub_e_treha = sf.external_grid_patchy(setBackground)
     
     # Plotting label scaling parameters for external domain
     num_ticks = 11 # number of tick labels to appear
@@ -154,6 +166,7 @@ def driver_singleNutrient(run):
     count_tips = []
     count_radii = []
     count_times = []
+    total_length_progression = []
     
     
     # ----------------------------------------------------------------------------
@@ -232,14 +245,18 @@ def driver_singleNutrient(run):
         # EXTENSION (GROWTH)
         tG_0 = time.time()
         
-        old_num_total_segs = num_total_segs 
+        old_num_total_segs = num_total_segs
         # breakpoint()
-        mycelia, num_total_segs, dtt = gf.extension(mycelia, num_total_segs, dtt, x_vals, y_vals,isCalibration, dist2Tip_new, fungal_fusion)
+        mycelia, num_total_segs, dtt = gf.extension(mycelia, num_total_segs, 
+                                        dtt, x_vals, y_vals,isCalibration, 
+                                        dist2Tip_new, fungal_fusion,
+                                        chance_to_fuse)
         if(np.any(np.isnan(mycelia['cw_i'][:num_total_segs]))):
             breakpoint()
+        
         if (old_num_total_segs > num_total_segs):
            breakpoint()
-
+       
         tG_1 = time.time()
         time_extend += (tG_1 - tG_0)
         
@@ -251,10 +268,13 @@ def driver_singleNutrient(run):
         
         old_num_total_segs = num_total_segs 
         if any(np.where(mycelia['can_branch'])[0]):
-            mycelia, num_total_segs, dtt = gf.branching(mycelia, num_total_segs, dtt, x_vals, y_vals, isCalibration, dist2Tip_new, fungal_fusion, restrictBranching)
+            mycelia, num_total_segs, dtt = gf.branching(mycelia, 
+                                        num_total_segs, dtt, x_vals, y_vals, 
+                                        isCalibration, dist2Tip_new, 
+                                        fungal_fusion, restrictBranching,
+                                        chance_to_fuse)
         if (old_num_total_segs > num_total_segs):
            breakpoint()
-
         tB_1 = time.time()
         if (np.isnan(np.sum(mycelia['cw_i'][:num_total_segs]))):
                 breakpoint()
@@ -287,8 +307,6 @@ def driver_singleNutrient(run):
         
         # UPTAKE
         tU_0 = time.time()
-        #if current_step % (1*40) == 0:
-        #    breakpoint()
         mycelia = nf.uptake(sub_e_gluc, mycelia, num_total_segs)
         # breakpoint()
         mycelia = nf.release(sub_e_treha, mycelia, num_total_segs, isTipRelease)
@@ -303,7 +321,8 @@ def driver_singleNutrient(run):
                 
         # PLOT & SAVE DATA
         if current_step % (4*160) == 0: 
-        #if current_step % (1*40) == 0:
+        # if current_step % (1*160) == 0:
+            # breakpoint()
             hf.plot_fungus(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
             hf.plot_fungus_gluc(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
             # hf.plot_fungus_generic(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
@@ -313,12 +332,11 @@ def driver_singleNutrient(run):
                 glucose_ext = sub_e_gluc/params['vol_grid']*1e12 # Convert to molar quantities for display
                 max_e_gluc = np.max(glucose_ext)
                 print('max_e_gluc : ', max_e_gluc)
-                hf.plot_externalsub(sub_e_gluc, yticks, yticklabels, current_time, max_e_gluc, 'Se', folder_string, param_string, params, run)
+                hf.plot_externalsub(glucose_ext, yticks, yticklabels, current_time, max_e_gluc, 'Se', folder_string, param_string, params, run)
                 treha_ext = sub_e_treha/params['vol_grid']*1e12 # Convert to molar quantities for display
                 max_e_treha = np.max(treha_ext)
-                print('max_e_treha : ', max_e_treha)
                 # max_e_treha_fixed = 1e-11
-                hf.plot_externalsub_treha(sub_e_treha, yticks, yticklabels, current_time, max_e_treha, 'Se', folder_string, param_string, params, run)
+                hf.plot_externalsub_treha(treha_ext, yticks, yticklabels, current_time, max_e_treha, 'Se', folder_string, param_string, params, run)
             
             # dist_from_center = []
             # for i in range(num_total_segs):
@@ -328,8 +346,11 @@ def driver_singleNutrient(run):
             #     mycelia['dist_from_center'][i] = (np.sqrt(mycelia['xy2'][i][0]**2 + mycelia['xy2'][i][1]**2))
             DONT_INCLUDE = np.where(mycelia['branch_id'][:num_total_segs] == -1)[0]
             DO_INCLUDE = np.where(mycelia['branch_id'][:num_total_segs]>-1)[0]
+            total_length = 0.0
             for i in range(len(DO_INCLUDE)):
                 mycelia['dist_from_center'][DO_INCLUDE[i]] = (np.sqrt(mycelia['xy2'][DO_INCLUDE[i]][0]**2 + mycelia['xy2'][DO_INCLUDE[i]][1]**2))
+                total_length += (np.sqrt((mycelia['xy2'][DO_INCLUDE[i]][0] - mycelia['xy1'][DO_INCLUDE[i]][0])**2 + (mycelia['xy2'][DO_INCLUDE[i]][1] - mycelia['xy1'][DO_INCLUDE[i]][1])**2))
+            total_length_progression.append(total_length)
             mycelia['dist_from_center'][DONT_INCLUDE] = 0.0;
             hf.plot_hist(mycelia, current_time, num_total_segs, param_string, params, run)
             
@@ -338,7 +359,7 @@ def driver_singleNutrient(run):
             count_radii.append(max(np.sqrt(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2)))
             count_times.append(current_time)
             
-            N = round(len(x_vals)/2)-1
+            N = round(len(x_vals)/2)-2
         
             avg_treha_annulus = np.zeros(N)
             max_treha_annulus = np.zeros(N)
@@ -349,134 +370,280 @@ def driver_singleNutrient(run):
             center_y = round(len(y_vals)/2)#np.where(y_vals == 0)[0]
             print('center_y : ', center_y)
             
-            ## For "pseudo-raidal" annulus
+            ## For "pseudo-radial" annulus on center of each cell (with 4 grid points)
             for i in range(N):
                 count = 0
                 min_treha = 1e5
                 max_treha = -1e5
                 if i == 0:
-                    # continue
-                    avg_treha_annulus[i] = sub_e_treha[center_x,center_y]
-                    count+=1
-                # elif i == 1:
-                elif i == 1:
-                    avg_treha_annulus[i] += sub_e_treha[center_x+1, center_y+0]
-                    if (sub_e_treha[center_x+1, center_y+0] >= max_treha):
-                        max_treha = sub_e_treha[center_x+1, center_y+0]
-                    if (sub_e_treha[center_x+1, center_y+0] <= min_treha):
-                        min_treha = sub_e_treha[center_x+1, center_y+0]
-                    avg_treha_annulus[i] += sub_e_treha[center_x+1, center_y+1]
-                    if (sub_e_treha[center_x+1, center_y+1] >= max_treha):
-                        max_treha = sub_e_treha[center_x+1, center_y+1]
-                    if (sub_e_treha[center_x+1, center_y+1] <= min_treha):
-                        min_treha = sub_e_treha[center_x+1, center_y+1]
-                    avg_treha_annulus[i] += sub_e_treha[center_x+1, center_y-1]
-                    if (sub_e_treha[center_x+1, center_y-1] >= max_treha):
-                        max_treha = sub_e_treha[center_x+1, center_y-1]
-                    if (sub_e_treha[center_x+1, center_y-1] <= min_treha):
-                        min_treha = sub_e_treha[center_x+1, center_y-1]
-                    avg_treha_annulus[i] += sub_e_treha[center_x, center_y+1]
-                    if (sub_e_treha[center_x, center_y+1] >= max_treha):
-                        max_treha = sub_e_treha[center_x, center_y+1]
-                    if (sub_e_treha[center_x, center_y+1] <= min_treha):
-                        min_treha = sub_e_treha[center_x, center_y+1]
-                    avg_treha_annulus[i] += sub_e_treha[center_x, center_y-1]
-                    if (sub_e_treha[center_x, center_y-1] >= max_treha):
-                        max_treha = sub_e_treha[center_x, center_y-1]
-                    if (sub_e_treha[center_x, center_y-1] <= min_treha):
-                        min_treha = sub_e_treha[center_x, center_y-1]
-                    avg_treha_annulus[i] += sub_e_treha[center_x-1, center_y+0]
-                    if (sub_e_treha[center_x-1, center_y+0] >= max_treha):
-                        max_treha = sub_e_treha[center_x-1, center_y+0]
-                    if (sub_e_treha[center_x-1, center_y+0] <= min_treha):
-                        min_treha = sub_e_treha[center_x-1, center_y+0]
-                    avg_treha_annulus[i] += sub_e_treha[center_x-1, center_y+1]
-                    if (sub_e_treha[center_x-1, center_y+1] >= max_treha):
-                        max_treha = sub_e_treha[center_x-1, center_y+1]
-                    if (sub_e_treha[center_x-1, center_y+1] <= min_treha):
-                        min_treha = sub_e_treha[center_x-1, center_y+1]
-                    avg_treha_annulus[i] += sub_e_treha[center_x-1, center_y-1]
-                    if (sub_e_treha[center_x-1, center_y-1] >= max_treha):
-                        max_treha = sub_e_treha[center_x-1, center_y-1]
-                    if (sub_e_treha[center_x-1, center_y-1] <= min_treha):
-                        min_treha = sub_e_treha[center_x-1, center_y-1]
-                    avg_treha_annulus[i] = avg_treha_annulus[i]/8.0
-                    max_treha_annulus[i] = max_treha
-                    min_treha_annulus[i] = min_treha
-                else:
-                    for j in range(0,i):
-                        if j <= (i-1):
-                                avg_treha_annulus[i] += sub_e_treha[center_x+j, center_y+i]
-                                if (sub_e_treha[center_x+j, center_y+i] >= max_treha):
-                                    max_treha = sub_e_treha[center_x+j, center_y+i]
-                                if (sub_e_treha[center_x+j, center_y+i] <= min_treha):
-                                    min_treha = sub_e_treha[center_x+j, center_y+i]
-                                
-                                avg_treha_annulus[i] += sub_e_treha[center_x+j, center_y-i]
-                                if (sub_e_treha[center_x+j, center_y-i] >= max_treha):
-                                    max_treha = sub_e_treha[center_x+j, center_y-i]
-                                if (sub_e_treha[center_x+j, center_y-i] <= min_treha):
-                                    min_treha = sub_e_treha[center_x+j, center_y-i]
-                                
-                                avg_treha_annulus[i] += sub_e_treha[center_x-j, center_y+i]
-                                if (sub_e_treha[center_x-j, center_y+i] >= max_treha):
-                                    max_treha = sub_e_treha[center_x-j, center_y+i]
-                                if (sub_e_treha[center_x-j, center_y+i] <= min_treha):
-                                    min_treha = sub_e_treha[center_x-j, center_y+i]
-                                    
-                                avg_treha_annulus[i] += sub_e_treha[center_x-j, center_y-i]
-                                if (sub_e_treha[center_x-j, center_y-i] >= max_treha):
-                                    max_treha = sub_e_treha[center_x-j, center_y-i]
-                                if (sub_e_treha[center_x-j, center_y-i] <= min_treha):
-                                    min_treha = sub_e_treha[center_x-j, center_y-i]
-                                    
-                                count += 4
-                        else:
-                            for k in range(0,i-1):
-                                if k == 0:
-                                    avg_treha_annulus[i] += sub_e_treha[center_x+j, center_y+k]
-                                    if (sub_e_treha[center_x+j, center_y+k] >= max_treha):
-                                        max_treha = sub_e_treha[center_x+j, center_y+k]
-                                    if (sub_e_treha[center_x+j, center_y+k] <= min_treha):
-                                        min_treha = sub_e_treha[center_x+j, center_y+k]
-                                    
-                                    avg_treha_annulus[i] += sub_e_treha[center_x-j, center_y+k]
-                                    if (sub_e_treha[center_x-j, center_y+k] >= max_treha):
-                                        max_treha = sub_e_treha[center_x-j, center_y+k]
-                                    if (sub_e_treha[center_x-j, center_y+k] <= min_treha):
-                                        min_treha = sub_e_treha[center_x-j, center_y+k]
-                                    
-                                    count += 2
-                                else:
-                                    avg_treha_annulus[i] += sub_e_treha[center_x+j, center_y+k]
-                                    if (sub_e_treha[center_x+j, center_y+k] >= max_treha):
-                                        max_treha = sub_e_treha[center_x+j, center_y+k]
-                                    if (sub_e_treha[center_x+j, center_y+k] <= min_treha):
-                                        min_treha = sub_e_treha[center_x+j, center_y+k]
-                                    
-                                    avg_treha_annulus[i] += sub_e_treha[center_x+j, center_y-k]
-                                    if (sub_e_treha[center_x+j, center_y-i] >= max_treha):
-                                        max_treha = sub_e_treha[center_x+j, center_y-k]
-                                    if (sub_e_treha[center_x+j, center_y-i] <= min_treha):
-                                        min_treha = sub_e_treha[center_x+j, center_y-k]
-                                    
-                                    avg_treha_annulus[i] += sub_e_treha[center_x-j, center_y+k]
-                                    if (sub_e_treha[center_x-j, center_y+k] >= max_treha):
-                                        max_treha = sub_e_treha[center_x-j, center_y+k]
-                                    if (sub_e_treha[center_x-j, center_y+k] <= min_treha):
-                                        min_treha = sub_e_treha[center_x-j, center_y+k]
-                        
-                                    avg_treha_annulus[i] += sub_e_treha[center_x-j, center_y-k]
-                                    if (sub_e_treha[center_x-j, center_y-i] >= max_treha):
-                                        max_treha = sub_e_treha[center_x-j, center_y-k]
-                                    if (sub_e_treha[center_x-j, center_y-i] <= min_treha):
-                                        min_treha = sub_e_treha[center_x+j, center_y-k]
-                                    
-                                    count += 4
+                    j = 1
+                    block1 = (1/4)*(sub_e_treha[center_x, center_y] +
+                                            sub_e_treha[center_x+j, center_y] +
+                                            sub_e_treha[center_x, center_y+j] +
+                                            sub_e_treha[center_x+j, center_y+j] )
+                    if (block1 >= max_treha):
+                        max_treha = block1
+                    if (block1 <= min_treha):
+                        min_treha = block1
+                    avg_treha_annulus[i] += block1
                     
-                    avg_treha_annulus[i] = avg_treha_annulus[i]/count
-                    max_treha_annulus[i] = max_treha
-                    min_treha_annulus[i] = min_treha
+                    block2 = (1/4)*(sub_e_treha[center_x, center_y] +
+                                            sub_e_treha[center_x+j, center_y] +
+                                            sub_e_treha[center_x, center_y-j] +
+                                            sub_e_treha[center_x+j, center_y-j] )
+                    if (block2 >= max_treha):
+                        max_treha = block2
+                    if (block2 <= min_treha):
+                        min_treha = block2
+                    avg_treha_annulus[i] += block2
+                    
+                    block3 = (1/4)*(sub_e_treha[center_x, center_y] +
+                                            sub_e_treha[center_x-j, center_y] +
+                                            sub_e_treha[center_x, center_y+j] +
+                                            sub_e_treha[center_x-j, center_y+j] )
+                    if (block3 >= max_treha):
+                        max_treha = block3
+                    if (block3 <= min_treha):
+                        min_treha = block3
+                    avg_treha_annulus[i] += block3
+                    
+                    block4 = (1/4)*(sub_e_treha[center_x, center_y] +
+                                            sub_e_treha[center_x-j, center_y] +
+                                            sub_e_treha[center_x, center_y-j] +
+                                            sub_e_treha[center_x-j, center_y-j] )
+                    if (block4 >= max_treha):
+                        max_treha = block4
+                    if (block4 <= min_treha):
+                        min_treha = block4
+                    avg_treha_annulus[i] += block4
+                    
+                    count = 4
+                
+                else:
+                    for j in range(0,i+1):
+                        if (j < i):
+                            block = (1/4)*(sub_e_treha[center_x+j, center_y+i] +
+                                            sub_e_treha[center_x+j, center_y+i+1] +
+                                            sub_e_treha[center_x+j+1, center_y+i] +
+                                            sub_e_treha[center_x+j+1, center_y+i+1] )
+                            if (block >= max_treha):
+                                max_treha = block
+                            if (block <= min_treha):
+                                min_treha = block
+                            count +=1
+                            avg_treha_annulus[i] += block
+                            
+                            block = (1/4)*(sub_e_treha[center_x+j, center_y-i] +
+                                            sub_e_treha[center_x+j, center_y-i-1] +
+                                            sub_e_treha[center_x+j+1, center_y-i] +
+                                            sub_e_treha[center_x+j+1, center_y-i-1] )
+                            if (block >= max_treha):
+                                max_treha = block
+                            if (block <= min_treha):
+                                min_treha = block
+                            count +=1
+                            avg_treha_annulus[i] += block
+                            
+                            block = (1/4)*(sub_e_treha[center_x-j, center_y+i] +
+                                            sub_e_treha[center_x-j, center_y+i+1] +
+                                            sub_e_treha[center_x-j-1, center_y+i] +
+                                            sub_e_treha[center_x-j-1, center_y+i+1] )
+                            if (block >= max_treha):
+                                max_treha = block
+                            if (block <= min_treha):
+                                min_treha = block
+                            count +=1
+                            avg_treha_annulus[i] += block
+                            
+                            block = (1/4)*(sub_e_treha[center_x-j, center_y-i] +
+                                            sub_e_treha[center_x-j, center_y-i-1] +
+                                            sub_e_treha[center_x-j-1, center_y-i] +
+                                            sub_e_treha[center_x-j-1, center_y-i-1] )
+                            if (block >= max_treha):
+                                max_treha = block
+                            if (block <= min_treha):
+                                min_treha = block
+                            count +=1
+                            avg_treha_annulus[i] += block
+                        
+                        if (j == i):
+                            for k in range(0, i+1): # Say, i = 1, k varies between 0 ~ 1
+                                block = (1/4)*(sub_e_treha[center_x+j, center_y+k] +
+                                                sub_e_treha[center_x+j, center_y+k+1] +
+                                                sub_e_treha[center_x+j+1, center_y+k] +
+                                                sub_e_treha[center_x+j+1, center_y+k+1] )
+                                if (block >= max_treha):
+                                    max_treha = block
+                                if (block <= min_treha):
+                                    min_treha = block
+                                count +=1
+                                avg_treha_annulus[i] += block
+                                
+                                block = (1/4)*(sub_e_treha[center_x+j, center_y-k] +
+                                                sub_e_treha[center_x+j, center_y-k-1] +
+                                                sub_e_treha[center_x+j+1, center_y-k] +
+                                                sub_e_treha[center_x+j+1, center_y-k-1] )
+                                if (block >= max_treha):
+                                    max_treha = block
+                                if (block <= min_treha):
+                                    min_treha = block
+                                count +=1
+                                avg_treha_annulus[i] += block
+                                
+                                block = (1/4)*(sub_e_treha[center_x-j, center_y+k] +
+                                                sub_e_treha[center_x-j, center_y+k+1] +
+                                                sub_e_treha[center_x-j-1, center_y+k] +
+                                                sub_e_treha[center_x-j-1, center_y+k+1] )
+                                if (block >= max_treha):
+                                    max_treha = block
+                                if (block <= min_treha):
+                                    min_treha = block
+                                count +=1
+                                avg_treha_annulus[i] += block
+                                
+                                block = (1/4)*(sub_e_treha[center_x-j, center_y-k] +
+                                                sub_e_treha[center_x-j, center_y-k-1] +
+                                                sub_e_treha[center_x-j-1, center_y-k] +
+                                                sub_e_treha[center_x-j-1, center_y-k-1] )
+                                if (block >= max_treha):
+                                    max_treha = block
+                                if (block <= min_treha):
+                                    min_treha = block
+                                count +=1
+                                avg_treha_annulus[i] += block
+                    
+                avg_treha_annulus[i] = avg_treha_annulus[i]/count
+                max_treha_annulus[i] = max_treha
+                min_treha_annulus[i] = min_treha
+            
+            ## For "pseudo-raidal" annulus on grid points only
+            # for i in range(N):
+            #     count = 0
+            #     min_treha = 1e5
+            #     max_treha = -1e5
+            #     if i == 0:
+            #         # continue
+            #         avg_treha_annulus[i] = sub_e_treha[center_x,center_y]
+            #         count+=1
+            #     # elif i == 1:
+            #     elif i == 1:
+            #         avg_treha_annulus[i] += sub_e_treha[center_x+1, center_y+0]
+            #         if (sub_e_treha[center_x+1, center_y+0] >= max_treha):
+            #             max_treha = sub_e_treha[center_x+1, center_y+0]
+            #         if (sub_e_treha[center_x+1, center_y+0] <= min_treha):
+            #             min_treha = sub_e_treha[center_x+1, center_y+0]
+            #         avg_treha_annulus[i] += sub_e_treha[center_x+1, center_y+1]
+            #         if (sub_e_treha[center_x+1, center_y+1] >= max_treha):
+            #             max_treha = sub_e_treha[center_x+1, center_y+1]
+            #         if (sub_e_treha[center_x+1, center_y+1] <= min_treha):
+            #             min_treha = sub_e_treha[center_x+1, center_y+1]
+            #         avg_treha_annulus[i] += sub_e_treha[center_x+1, center_y-1]
+            #         if (sub_e_treha[center_x+1, center_y-1] >= max_treha):
+            #             max_treha = sub_e_treha[center_x+1, center_y-1]
+            #         if (sub_e_treha[center_x+1, center_y-1] <= min_treha):
+            #             min_treha = sub_e_treha[center_x+1, center_y-1]
+            #         avg_treha_annulus[i] += sub_e_treha[center_x, center_y+1]
+            #         if (sub_e_treha[center_x, center_y+1] >= max_treha):
+            #             max_treha = sub_e_treha[center_x, center_y+1]
+            #         if (sub_e_treha[center_x, center_y+1] <= min_treha):
+            #             min_treha = sub_e_treha[center_x, center_y+1]
+            #         avg_treha_annulus[i] += sub_e_treha[center_x, center_y-1]
+            #         if (sub_e_treha[center_x, center_y-1] >= max_treha):
+            #             max_treha = sub_e_treha[center_x, center_y-1]
+            #         if (sub_e_treha[center_x, center_y-1] <= min_treha):
+            #             min_treha = sub_e_treha[center_x, center_y-1]
+            #         avg_treha_annulus[i] += sub_e_treha[center_x-1, center_y+0]
+            #         if (sub_e_treha[center_x-1, center_y+0] >= max_treha):
+            #             max_treha = sub_e_treha[center_x-1, center_y+0]
+            #         if (sub_e_treha[center_x-1, center_y+0] <= min_treha):
+            #             min_treha = sub_e_treha[center_x-1, center_y+0]
+            #         avg_treha_annulus[i] += sub_e_treha[center_x-1, center_y+1]
+            #         if (sub_e_treha[center_x-1, center_y+1] >= max_treha):
+            #             max_treha = sub_e_treha[center_x-1, center_y+1]
+            #         if (sub_e_treha[center_x-1, center_y+1] <= min_treha):
+            #             min_treha = sub_e_treha[center_x-1, center_y+1]
+            #         avg_treha_annulus[i] += sub_e_treha[center_x-1, center_y-1]
+            #         if (sub_e_treha[center_x-1, center_y-1] >= max_treha):
+            #             max_treha = sub_e_treha[center_x-1, center_y-1]
+            #         if (sub_e_treha[center_x-1, center_y-1] <= min_treha):
+            #             min_treha = sub_e_treha[center_x-1, center_y-1]
+            #         avg_treha_annulus[i] = avg_treha_annulus[i]/8.0
+            #         max_treha_annulus[i] = max_treha
+            #         min_treha_annulus[i] = min_treha
+            #     else:
+            #         for j in range(0,i):
+            #             if j <= (i-1):
+            #                     avg_treha_annulus[i] += sub_e_treha[center_x+j, center_y+i]
+            #                     if (sub_e_treha[center_x+j, center_y+i] >= max_treha):
+            #                         max_treha = sub_e_treha[center_x+j, center_y+i]
+            #                     if (sub_e_treha[center_x+j, center_y+i] <= min_treha):
+            #                         min_treha = sub_e_treha[center_x+j, center_y+i]
+                                
+            #                     avg_treha_annulus[i] += sub_e_treha[center_x+j, center_y-i]
+            #                     if (sub_e_treha[center_x+j, center_y-i] >= max_treha):
+            #                         max_treha = sub_e_treha[center_x+j, center_y-i]
+            #                     if (sub_e_treha[center_x+j, center_y-i] <= min_treha):
+            #                         min_treha = sub_e_treha[center_x+j, center_y-i]
+                                
+            #                     avg_treha_annulus[i] += sub_e_treha[center_x-j, center_y+i]
+            #                     if (sub_e_treha[center_x-j, center_y+i] >= max_treha):
+            #                         max_treha = sub_e_treha[center_x-j, center_y+i]
+            #                     if (sub_e_treha[center_x-j, center_y+i] <= min_treha):
+            #                         min_treha = sub_e_treha[center_x-j, center_y+i]
+                                    
+            #                     avg_treha_annulus[i] += sub_e_treha[center_x-j, center_y-i]
+            #                     if (sub_e_treha[center_x-j, center_y-i] >= max_treha):
+            #                         max_treha = sub_e_treha[center_x-j, center_y-i]
+            #                     if (sub_e_treha[center_x-j, center_y-i] <= min_treha):
+            #                         min_treha = sub_e_treha[center_x-j, center_y-i]
+                                    
+            #                     count += 4
+            #             else:
+            #                 for k in range(0,i-1):
+            #                     if k == 0:
+            #                         avg_treha_annulus[i] += sub_e_treha[center_x+j, center_y+k]
+            #                         if (sub_e_treha[center_x+j, center_y+k] >= max_treha):
+            #                             max_treha = sub_e_treha[center_x+j, center_y+k]
+            #                         if (sub_e_treha[center_x+j, center_y+k] <= min_treha):
+            #                             min_treha = sub_e_treha[center_x+j, center_y+k]
+                                    
+            #                         avg_treha_annulus[i] += sub_e_treha[center_x-j, center_y+k]
+            #                         if (sub_e_treha[center_x-j, center_y+k] >= max_treha):
+            #                             max_treha = sub_e_treha[center_x-j, center_y+k]
+            #                         if (sub_e_treha[center_x-j, center_y+k] <= min_treha):
+            #                             min_treha = sub_e_treha[center_x-j, center_y+k]
+                                    
+            #                         count += 2
+            #                     else:
+            #                         avg_treha_annulus[i] += sub_e_treha[center_x+j, center_y+k]
+            #                         if (sub_e_treha[center_x+j, center_y+k] >= max_treha):
+            #                             max_treha = sub_e_treha[center_x+j, center_y+k]
+            #                         if (sub_e_treha[center_x+j, center_y+k] <= min_treha):
+            #                             min_treha = sub_e_treha[center_x+j, center_y+k]
+                                    
+            #                         avg_treha_annulus[i] += sub_e_treha[center_x+j, center_y-k]
+            #                         if (sub_e_treha[center_x+j, center_y-i] >= max_treha):
+            #                             max_treha = sub_e_treha[center_x+j, center_y-k]
+            #                         if (sub_e_treha[center_x+j, center_y-i] <= min_treha):
+            #                             min_treha = sub_e_treha[center_x+j, center_y-k]
+                                    
+            #                         avg_treha_annulus[i] += sub_e_treha[center_x-j, center_y+k]
+            #                         if (sub_e_treha[center_x-j, center_y+k] >= max_treha):
+            #                             max_treha = sub_e_treha[center_x-j, center_y+k]
+            #                         if (sub_e_treha[center_x-j, center_y+k] <= min_treha):
+            #                             min_treha = sub_e_treha[center_x-j, center_y+k]
+                        
+            #                         avg_treha_annulus[i] += sub_e_treha[center_x-j, center_y-k]
+            #                         if (sub_e_treha[center_x-j, center_y-i] >= max_treha):
+            #                             max_treha = sub_e_treha[center_x-j, center_y-k]
+            #                         if (sub_e_treha[center_x-j, center_y-i] <= min_treha):
+            #                             min_treha = sub_e_treha[center_x+j, center_y-k]
+                                    
+            #                         count += 4
+                    
+            #         avg_treha_annulus[i] = avg_treha_annulus[i]/count
+            #         max_treha_annulus[i] = max_treha
+            #         min_treha_annulus[i] = min_treha
             # breakpoint()            
             
             WWWW = np.where(avg_treha_annulus == np.max(avg_treha_annulus))[0]
@@ -497,6 +664,7 @@ def driver_singleNutrient(run):
     hf.plot_fungus_treha(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
     if params['init_sub_e_gluc'] > 1e-15:
         hf.plot_externalsub(sub_e_gluc, yticks, yticklabels, current_time, params['init_sub_e_gluc'], 'Se', folder_string, param_string, params, run)
+        max_e_treha = np.max(sub_e_treha)
         hf.plot_externalsub_treha(sub_e_treha, yticks, yticklabels, current_time, max_e_treha, 'Se', folder_string, param_string, params, run)
     
     for i in range(num_total_segs):
@@ -711,7 +879,8 @@ def driver_singleNutrient(run):
     print('isPatchyExtEnvironment :', format(isPatchyExtEnvironment))
     print('isConvectDependOnMetabo_cw : ', format(isConvectDependOnMetabo_cw))
     print('isConvectDependOnMetabo_gluc : ', format(isConvectDependOnMetabo_gluc))
-    print('isConvectDependOnMetabo_treha :', format(isConvectDependOnMetabo_treha))
+    print('isConvectDependOnMetabo_treha : ', format(isConvectDependOnMetabo_treha))
+    print('chance_to_fuse : ', format(chance_to_fuse))
     print('RESULTS:')
     print('Max segment length: {}',format(max_seg_length))
     print('Min segment length: {}',format(min_seg_length))
@@ -762,6 +931,8 @@ def driver_singleNutrient(run):
         'isConvectDependOnMetabo_cw' : isConvectDependOnMetabo_cw,
         'isConvectDependOnMetabo_gluc' : isConvectDependOnMetabo_gluc,
         'isConvectDependOnMetabo_treha' : isConvectDependOnMetabo_treha,
+        'chance_to_fuse' : chance_to_fuse,
+        'total_length_progression' : np.array(total_length_progression),
         'avg_treha_annulus' : avg_treha_annulus,
         'max_treha_annulus' : max_treha_annulus,
         'min_treha_annulus' : min_treha_annulus}
