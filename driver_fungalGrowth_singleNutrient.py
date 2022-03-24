@@ -332,11 +332,11 @@ def driver_singleNutrient(run):
                 glucose_ext = sub_e_gluc/params['vol_grid']*1e12 # Convert to molar quantities for display
                 max_e_gluc = np.max(glucose_ext)
                 print('max_e_gluc : ', max_e_gluc)
-                hf.plot_externalsub(glucose_ext, yticks, yticklabels, current_time, max_e_gluc, 'Se', folder_string, param_string, params, run)
+                hf.plot_externalsub(sub_e_gluc, yticks, yticklabels, current_time, max_e_gluc, 'Se', folder_string, param_string, params, run)
                 treha_ext = sub_e_treha/params['vol_grid']*1e12 # Convert to molar quantities for display
                 max_e_treha = np.max(treha_ext)
                 # max_e_treha_fixed = 1e-11
-                hf.plot_externalsub_treha(treha_ext, yticks, yticklabels, current_time, max_e_treha, 'Se', folder_string, param_string, params, run)
+                hf.plot_externalsub_treha(sub_e_treha, yticks, yticklabels, current_time, max_e_treha, 'Se', folder_string, param_string, params, run)
             
             # dist_from_center = []
             # for i in range(num_total_segs):
