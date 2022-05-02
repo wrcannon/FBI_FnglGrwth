@@ -149,26 +149,32 @@ def cost_of_growth(mycelia, idxs, grow_len):
         breakpoint()
     # Cost to grow predetermined amount
 
-    # Here we are testing to see if there is enough material in the previous
-    # segment to form a new section of cell wall of length grow_len.
+    # Here we are testing to see if there is enough material in the
+    # segment to extend the segment the length of length grow_len.
     #cost_grow_cq = grow_len* area * density* (dry mass/wet mass/)(cellwallmass/dry mass) (millimeters/cubic micron) * mw(cw_i)
     # gamma is mmoles cw_i/micron
     gamma = params['f_dw']* params['f_wall'] * params['f_cw_cellwall']/params['mw_cw']* \
            params['hy_density']*params['cross_area']
     cost_grow_cw1 = grow_len * gamma # cost in mmoles of cw_i
+    #cost_grow_cw1 = grow_len * mycelia['cw_i'][idxs]
     #cost_grow_cw1 = grow_len* np.pi*(5.0/2)**2 * params['hy_density'] * params['f_dw']* \
     #    params['f_wall']  * params['f_cw_cellwall']/params['mw_cw']
     
     #cost_grow_cw1 = grow_len* np.pi*(5.0/2)**2 * params['hy_density'] * params['f_dw']* \
     #    params['f_wall']  * params['f_cw_cellwall']/params['mw_cw']
-    #Next test to see if the new tip volume will deplete all the material
-    #from the preceding segment without regard to the amount of material required
+
+    # Next test to see if the new tip volume will deplete all the material
+    # from the segment without regard to the amount of material required
     # to form the cell wall; That is, scale the length of the new tip so that the 
     # concentration of the preceding segment
     # doesn't become negative.
-    cost_grow_cw2 = (mycelia['cw_i'][idxs]/mycelia['seg_length'][idxs])  * (grow_len)    
+    #cost_grow_cw2 = (mycelia['cw_i'][idxs]/mycelia['seg_length'][idxs])  * (grow_len)
+    scale = michaelis_menten(1, cost_grow_cw1, 
+                                mycelia['cw_i'][idxs])
+    cost_grow_cw2 = cost_grow_cw1 * scale    
     #cost_grow_cw = np.maximum(np.max(cost_grow_cw1), np.max(cost_grow_cw2))
-    cost_grow_cw = np.maximum((cost_grow_cw1), (cost_grow_cw2))
+    #cost_grow_cw = np.maximum((cost_grow_cw1), (cost_grow_cw2))
+    cost_grow_cw = np.minimum((cost_grow_cw1), (cost_grow_cw2))
     #cost_grow_cw = cost_grow_cw2
     #Here we are testing to see if the new tip volume will deplete all the material
     #from the preceding segment
@@ -196,9 +202,9 @@ def cost_of_growth(mycelia, idxs, grow_len):
     if any(grow_len > 1e2):
         breakpoint()
     # scale = 0.3    
-    scale = 1.0
+    #scale = 1.0
     grow_len = grow_len*scale
-    cost_grow_cw = cost_grow_cw*scale
+    #cost_grow_cw = cost_grow_cw*scale
     #grow_len = grow_len *0.3
     #cost_grow_cw = cost_grow_cw *0.35
 
@@ -401,8 +407,9 @@ def septa_formation(mycelia, num_total_segs):
     # breakpoint()
     
     # Indicices of segments whose dist_to_septa is long enough to introduce new septa
-    septa_need = np.where(mycelia['dist_to_septa'][:num_total_segs] > 3*params['sl']*params['septa_len'])[0]
-    if any(mycelia['dist_to_septa'][septa_need] <= 3*params['sl']*params['septa_len']):
+    nn = 3
+    septa_need = np.where(mycelia['dist_to_septa'][:num_total_segs] > nn*params['sl']*params['septa_len'])[0]
+    if any(mycelia['dist_to_septa'][septa_need] <= nn*params['sl']*params['septa_len']):
         breakpoint()
     #septa_need = np.where(mycelia['dist_to_septa']> params['sl']*params['septa_len'])[0]
     # breakpoint()
@@ -426,6 +433,7 @@ def septa_formation(mycelia, num_total_segs):
             last_septa = max(np.where(mycelia['septa_loc'][segs_on_branch])[0])
 
             # New segment septa will have seg index N larger than last septa seg index
+            # N = septa_len = 1 currently
             new_septa = last_septa + params['septa_len']
             
             if new_septa >= len(segs_on_branch):
@@ -448,7 +456,7 @@ def septa_formation(mycelia, num_total_segs):
         else:
             # print('ELSE')
             if len(segs_on_branch) < 2:
-                breakpoint()
+                #breakpoint()
                 print('There is no other segments in this single-segment-branch branch. There is no need to set branching segments.')
                 #mycelia['septa_loc'][segs_on_branch[0]] = True
             else:
@@ -506,8 +514,9 @@ def split_segment(mycelia, num_total_segs, x_vals, y_vals, isCalibration, dist2T
     """
 
     # Locations of spliting tips
-    tips_to_split = np.where(mycelia['seg_length'][:num_total_segs] > 2*params['sl'])[0]
-    if any(mycelia['seg_length'][tips_to_split] < 2*params['sl']):
+    nn = 3
+    tips_to_split = np.where(mycelia['seg_length'][:num_total_segs] > (nn-1)*params['sl'])[0]
+    if any(mycelia['seg_length'][tips_to_split] < (nn-1)*params['sl']):
         breakpoint()
     new_tips = np.arange(len(tips_to_split)) + num_total_segs
     # print('segment(s) spliting, new tips', new_tips)
@@ -597,7 +606,9 @@ def split_segment(mycelia, num_total_segs, x_vals, y_vals, isCalibration, dist2T
 # ----------------------------------------------------------------------------
 
 # Extension - Main function for elongation
-def extension(mycelia, num_total_segs, dtt, x_vals, y_vals, isCalibration, dist2Tip_new, fungal_fusion):
+def extension(mycelia, num_total_segs, dtt, x_vals, y_vals, 
+              isCalibration, dist2Tip_new, fungal_fusion,
+              chance_to_fuse):
     """
     Parameters
     ----------
@@ -639,7 +650,8 @@ def extension(mycelia, num_total_segs, dtt, x_vals, y_vals, isCalibration, dist2
         dLdt = michaelis_menten(params['kg1_wall'],
                         params['Kg2_wall'],
                         mycelia['cw_i'][tip_idxs])
-        extend_len = params['dt']*dLdt
+        #extend_len = params['dt']*dLdt
+        extend_len = params['dt']*params['kg1_wall']*np.ones(np.shape([tip_idxs])).T
     
     if any(extend_len > 1e2):
         breakpoint()
@@ -664,21 +676,22 @@ def extension(mycelia, num_total_segs, dtt, x_vals, y_vals, isCalibration, dist2
         # Check for fusion
         if (fungal_fusion == 1):
             for idx in tip_idxs:
-                mycelia = anastomosis(mycelia, idx, num_total_segs)
+                mycelia = anastomosis(mycelia, idx, num_total_segs, chance_to_fuse)
             if(np.any(np.isnan(mycelia['cw_i']))):
                 breakpoint()
 ##############################################################################
 ##############################################################################
 
         # Check if septa forms (i.e. when tip compartment is 3x length of a compartment)
-        if max(mycelia['dist_to_septa']) > 3*params['sl']*params['septa_len']:
-        #if max(mycelia['dist_to_septa']) > params['sl']*params['septa_len']:
+        nn = 3
+        #if max(mycelia['dist_to_septa']) > 3*params['sl']*params['septa_len']:
+        if max(mycelia['dist_to_septa']) > nn*params['sl']*params['septa_len']:
             mycelia = septa_formation(mycelia, num_total_segs)
             # print('Septa formation from 3x length')
         # if(np.any(np.isnan(mycelia['cw_i']))):
         #     breakpoint()
         # Check if any tip segment splits
-        if max(mycelia['seg_length'][tip_idxs] > 2*params['sl']):
+        if max(mycelia['seg_length'][tip_idxs] > (nn-1)*params['sl']):
             mycelia, num_total_segs, dtt = split_segment(mycelia, num_total_segs, x_vals, y_vals, isCalibration, dist2Tip_new)
             # print('Septa formation from 2x length')
         # if(np.any(np.isnan(mycelia['cw_i']))):
@@ -688,7 +701,9 @@ def extension(mycelia, num_total_segs, dtt, x_vals, y_vals, isCalibration, dist2
 # ----------------------------------------------------------------------------
 
 # Branching - Main function for new branches
-def branching(mycelia, num_total_segs, dtt, x_vals, y_vals, isCalibration, dist2Tip_new, fungal_fusion, restrictBranching):
+def branching(mycelia, num_total_segs, dtt, x_vals, y_vals, 
+              isCalibration, dist2Tip_new, fungal_fusion, restrictBranching,
+              chance_to_fuse):
     """
     Parameters
     ----------
@@ -718,7 +733,7 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals, isCalibration, dist2
     the structural information.
     """
     
-    use_original = 1
+    use_original = 0
     if (restrictBranching == 0):
         potential_branch_idxs = np.where(mycelia['can_branch'])[0]
     else:
@@ -792,7 +807,8 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals, isCalibration, dist2
             # New endpoint
             angle_sign = np.sign(np.random.uniform(-1,1,np.shape(mycelia['angle'][true_branch_ids])))
             mycelia['angle'][new_tips] = mycelia['angle'][true_branch_ids] + angle_sign*np.random.normal(params['branch_mean'], params['branch_sd'], np.shape(mycelia['angle'][true_branch_ids]))
-            mycelia = update_structure(mycelia, new_tips, branch_len, cost_branch_gluc, cost_branch_cw, isCalibration)
+            zero_cost = np.zeros(np.shape(cost_branch_cw))
+            mycelia = update_structure(mycelia, new_tips, branch_len, zero_cost, zero_cost, isCalibration)
 
             # breakpoint()
             # Designate new tip as a tip and set originating banch to can't branch
@@ -819,7 +835,7 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals, isCalibration, dist2
             
             if fungal_fusion == 1:
                 for idx in new_tips:
-                    mycelia = anastomosis(mycelia, idx, num_total_segs)
+                    mycelia = anastomosis(mycelia, idx, num_total_segs, chance_to_fuse)
 
             # Update distance to tip
             if dist2Tip_new == 1:
@@ -1043,7 +1059,7 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals, isCalibration, dist2
 
 # ----------------------------------------------------------------------------
 
-def anastomosis(mycelia, idx, num_total_segs):
+def anastomosis(mycelia, idx, num_total_segs, chance_to_fuse):
     """
     Parameters
     ----------
@@ -1135,11 +1151,11 @@ def anastomosis(mycelia, idx, num_total_segs):
                         # breakpoint()
                    
                     prob = np.random.uniform(0, 1, 1)
-                    if (prob > 0.25):
-                        print('Intersection found but fails probability check!')
+                    if (prob > chance_to_fuse):
+                        # print('Intersection found but fails probability check!')
                         continue
-                    else:
-                         print('Intersection found')
+                    # else:
+                         # print('Intersection found')
                     # If the intersection is with a bypassed segment, the intersection
                     # is re-establish with a neighbor of the bypassed segment.
                     if mycelia['bypass'][target_idx] == True:
@@ -1179,7 +1195,7 @@ def anastomosis(mycelia, idx, num_total_segs):
                     short_multi_seg_fuse = False
 
                     # If the segment is long enough (satisfies CFL), proceed normally
-                    if new_seg_len >= params['dt']*params['vel_wall']:
+                    if new_seg_len >= params['dt']*params['kg1_wall']:
                         # print('Fusion between segments of two branches resulting a CFL-satisfying segment.')
                         mycelia['seg_length'][idx] = new_seg_len
                         mycelia['is_tip'][idx] = False
