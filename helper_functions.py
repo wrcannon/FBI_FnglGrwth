@@ -58,11 +58,23 @@ def get_configs(config_filename):
     vol_grid = dy*dy*dz
     diff_e_gluc = nutrient_params.getfloat('diffusion_e_gluc')
     diff_i_gluc = nutrient_params.getfloat('diffusion_i_gluc')
-    vel_wall = nutrient_params.getfloat('vel_wall')
+    kg1_wall = nutrient_params.getfloat('kg1_wall')
+    hy_density =  growth_params.getfloat('hy_density')
+    f_dw = growth_params.getfloat('f_dw')
+    f_wall =  growth_params.getfloat('f_wall')
+    f_cw_cellwall =  growth_params.getfloat('f_cw_cellwall')
+    mw_cw = nutrient_params.getfloat('mw_cw')
 
     # dt = 0.99*(dy**2)/(4*diff_e_gluc)
-    dt = 0.75*min((sl**2/diff_i_gluc),(sl/vel_wall))
-    #dt = 0.5*0.75*min((sl**2/diff_i_gluc),(sl/vel_wall))
+    #dt = 0.75*min((sl**2/diff_i_gluc),(sl/kg1_wall)) #kg1_wall should be advection rate
+    advection_vel_cw = kg1_wall*cross_area*hy_density*1.0e+12*f_dw*f_wall*f_cw_cellwall \
+        /mw_cw
+
+    dt = 0.0025*min((sl**2/diff_i_gluc),(sl/kg1_wall)) #kg1_wall should be advection rate
+    dt = 0.01*min((sl**2/diff_i_gluc),1/(advection_vel_cw*0.02))
+
+    #dt = 22.5
+    #dt = 0.5*0.75*min((sl**2/diff_i_gluc),(sl/linear_growth_rate))
 
     up_state = nutrient_params['up_state']
     if up_state == 'repressed':
@@ -112,8 +124,7 @@ def get_configs(config_filename):
         'init_sub_i_gluc' : nutrient_params.getfloat('init_sub_i_gluc'),
         'diffusion_i_gluc' : nutrient_params.getfloat('diffusion_i_gluc'),
         'vel_gluc' : nutrient_params.getfloat('vel_gluc'),
-        'vel_wall' : nutrient_params.getfloat('vel_wall'),
-
+        
         # 'm_gluc' : nutrient_params.getfloat('m_gluc'),
         # 'rho' : nutrient_params.getfloat('rho')*vol_seg,
 
@@ -128,15 +139,18 @@ def get_configs(config_filename):
         'yield_c' : nutrient_params.getfloat('yield_c'),
 
         'kg1_wall' : nutrient_params.getfloat('kg1_wall'),
-        'vel_wall' : nutrient_params.getfloat('kg1_wall'),
         # 'Kg2_wall' : nutrient_params.getfloat('Kg2_wall')*vol_seg,
         'Kg2_wall' : nutrient_params.getfloat('Kg2_wall'),
         'yield_g' : nutrient_params.getfloat('yield_g'),
         'mw_cw' : nutrient_params.getfloat('mw_cw'),
         'mw_glucose' : nutrient_params.getfloat('mw_glucose'),
+        'advection_vel_cw' : advection_vel_cw,
 
         'num_v' : nutrient_params.getfloat('num_v')
     }
+    kc1_gluc = params_dict['kg1_wall']*params_dict['cross_area']*params_dict['hy_density']*params_dict['f_dw']*params_dict['f_wall']*params_dict['f_cw_cellwall'] \
+        /(params_dict['mw_cw']*params_dict['yield_c'])*1.0e+03
+    #params_dict['kc1_gluc'] = kc1_gluc
 
     if not('yield_c_in_mmoles' in params_dict):
     	params_dict['yield_c_in_mmoles'] = params_dict['yield_c']*params_dict['mw_glucose']/params_dict['mw_cw']
@@ -183,7 +197,8 @@ def get_filepath(params):
     #                                                         params['final_time'])
     # folder_string = "oldD2Tip_Fus_tipRe_brRate1e9_resBr4_noBkDiffLowGluc2_bkPatchy_Trsloc_4init"
     # folder_string = 'recalibration_02242022'
-    folder_string = "noFusion_tipRel_homogenousEnv_convert"
+    #folder_string = "noFusion_tipRel_homogenousEnv_convert"
+    folder_string = "noFusion_tipRel_patchy5Env_convert_branch0_4"
     # file_string = "{}_b={:.3e}_ieg={}_deg={}_iig={:.3e}_dig={}_vw={}_kyu={},{:.3e},{}_kyc={:.3e},{:.3e},{}_kyg={},{:.3e},{}".format(
     #     folder_string,
     #     params['branch_rate'],
@@ -196,7 +211,8 @@ def get_filepath(params):
     #     params['kg1_wall'], params['Kg2_wall'], params['yield_g'])
     # file_string = "oldD2Tip_Fus_tipRe_brRate1e9_resBr4_noBkDiffLowGluc2_bkPatchy_Trsloc_4init"
     # file_string = "recalibration_02242022"
-    file_string = "noFusion_tipRel_homogenousEnv"
+    file_string = "noFusion_tipRel_patchy5Env_branch0_4"
+    #file_string = "noFusion_tipRel_homogenousEnv"
     return folder_string, file_string
 
 
@@ -241,11 +257,9 @@ def plot_fungus(mycelia, num_total_segs, curr_time, folder_string, param_string,
     # y2 = mycelia['xy2'][:num_total_segs, 1].tolist()
     # si = mycelia['cw_i'][:num_total_segs].flatten()
 
-    if any(si == 0.0):
-        min_value = min(si[(si > 0)])
-        si[np.where(si == 0.0)] = min_value /10
-    if(np.any(np.isnan(si))):
-        breakpoint()
+    if any(si < 1.0e-9):
+        #min_value = min(si[(si > 1.0e-9)])
+        si[np.where(si < 1.0e-9)] = 1.0e-09
     si = np.log10(si)
 
 
@@ -724,7 +738,9 @@ def plot_externalsub(sub_e, yticks, yticklabels, curr_time, sub_e_max, plot_type
 
     """
     # Convert to molar quantities for display
-    sub_e = np.log(sub_e/params['vol_grid']*1e12) 
+    sub_e = np.log10(sub_e/params['vol_grid']*1e12)
+    inf_idx = np.where(np.isinf(sub_e)) 
+    sub_e[inf_idx] = -8.0
     sub_e_max = np.max(sub_e)
     
     # For the orange-blue color map
@@ -746,7 +762,7 @@ def plot_externalsub(sub_e, yticks, yticklabels, curr_time, sub_e_max, plot_type
     # breakpoint()
     # Plot
     if plot_type == 'Se':
-        ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmax=sub_e_max)#, xticklabels=yticklabels, yticklabels=yticklabels)
+        ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmax=sub_e_max, xticklabels=yticklabels, yticklabels=yticklabels)
     # elif plot_type == 'Ce':
     #     ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmin=0, xticklabels=yticklabels, yticklabels=yticklabels)
     # breakpoint()
