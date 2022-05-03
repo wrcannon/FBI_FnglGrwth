@@ -69,6 +69,9 @@ def get_configs(config_filename):
     #dt = 0.75*min((sl**2/diff_i_gluc),(sl/kg1_wall)) #kg1_wall should be advection rate
     advection_vel_cw = kg1_wall*cross_area*hy_density*1.0e+12*f_dw*f_wall*f_cw_cellwall \
         /mw_cw
+    advection_constant_gluc = kg1_wall*init_vol_seg #kg1_wall is the rate that the hyphae grows in one dimension. 
+                                                    # scaling it by the volume of the hyphae gives the rate that glucose
+                                                    # would spread in 2-dimensions per second.
 
     dt = 0.0025*min((sl**2/diff_i_gluc),(sl/kg1_wall)) #kg1_wall should be advection rate
     dt = 0.01*min((sl**2/diff_i_gluc),1/(advection_vel_cw*0.02))

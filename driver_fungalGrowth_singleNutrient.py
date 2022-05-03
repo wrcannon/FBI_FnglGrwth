@@ -22,12 +22,12 @@ import seaborn as sns
 num_cores = multiprocessing.cpu_count()
 
 # cwd_path ='/Users/libra/Desktop/FBI_FungalGrowth-Bill1'
-cwd_path ='/Users/d3k137/docs/projects/boltzmann/code/06212017/run/fungal_growth/kevin-bill2/FBI_FungalGrowth2-kevin'
+cwd_path ='/Users/d3k137/docs/projects/boltzmann/code/06212017/run/fungal_growth/FBI_FungalGrowth2'
 os.chdir(cwd_path)
 
 import helper_functions as hf
 import growth_functions as gf
-import nutrient_functions as nf
+import nutrient_functions2 as nf
 import setup_functions as sf
 
 # Define string constants
@@ -97,7 +97,7 @@ def driver_singleNutrient(run):
     # Why N = 2 would be the minimum? Because in the current setup, a segment
     # directly behind the tip is not enclosed by two septa hence not eligible
     # for branching.
-    restrictBranching = 0
+    restrictBranching = 3
     print('restrictBranching : ', restrictBranching)
     
     # Is the initial background environment with 'patchy' nutrient distribution?
@@ -242,6 +242,35 @@ def driver_singleNutrient(run):
             tE_1 = time.time()
             time_external += (tE_1 - tE_0)
         
+        # UPTAKE
+        tU_0 = time.time()
+        mycelia = nf.uptake(sub_e_gluc, mycelia, num_total_segs)
+        # breakpoint()
+        mycelia = nf.release(sub_e_treha, mycelia, num_total_segs, isTipRelease)
+        # mycelia = nf.uptake(sub_e_gluc, sub_e_treha, mycelia, num_total_segs)
+        if (np.isnan(np.sum(mycelia['cw_i'][:num_total_segs]))):
+                breakpoint()
+       
+        tU_1 = time.time()
+        time_uptake += (tU_1 - tU_0)
+        
+
+        # TRANSLOCATION
+        tT_0 = time.time()
+        
+        mycelia = nf.transloc(mycelia, num_total_segs, dtt, isActiveTrans,
+                              whichInitialCondition,
+                              isConvectDependOnMetabo_cw,
+                              isConvectDependOnMetabo_gluc,
+                              isConvectDependOnMetabo_treha)
+        if (np.isnan(np.sum(mycelia['cw_i'][:num_total_segs]))):
+                breakpoint()
+        
+        tT_1 = time.time()
+        time_translocation += (tT_1 - tT_0)
+        
+
+        
         # EXTENSION (GROWTH)
         tG_0 = time.time()
         
@@ -290,36 +319,9 @@ def driver_singleNutrient(run):
             print('Current number of active segments : ', len(num_seg))
             print('Current number of active branch : ', (num_branch))
             
-            
-        # TRANSLOCATION
-        tT_0 = time.time()
+               
         
-        mycelia = nf.transloc(mycelia, num_total_segs, dtt, isActiveTrans,
-                              whichInitialCondition,
-                              isConvectDependOnMetabo_cw,
-                              isConvectDependOnMetabo_gluc,
-                              isConvectDependOnMetabo_treha)
-        if (np.isnan(np.sum(mycelia['cw_i'][:num_total_segs]))):
-                breakpoint()
-        
-        tT_1 = time.time()
-        time_translocation += (tT_1 - tT_0)
-        
-       
-        
-        # UPTAKE
-        tU_0 = time.time()
-        mycelia = nf.uptake(sub_e_gluc, mycelia, num_total_segs)
-        # breakpoint()
-        mycelia = nf.release(sub_e_treha, mycelia, num_total_segs, isTipRelease)
-        # mycelia = nf.uptake(sub_e_gluc, sub_e_treha, mycelia, num_total_segs)
-        if (np.isnan(np.sum(mycelia['cw_i'][:num_total_segs]))):
-                breakpoint()
-       
-        tU_1 = time.time()
-        time_uptake += (tU_1 - tU_0)
-        
-        
+
                 
         # PLOT & SAVE DATA
         if current_step % (4*160) == 0: 
