@@ -27,7 +27,7 @@ os.chdir(cwd_path)
 
 import helper_functions as hf
 import growth_functions as gf
-import nutrient_functions2 as nf
+import nutrient_functions as nf
 import setup_functions as sf
 
 # Define string constants
