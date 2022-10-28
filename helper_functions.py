@@ -96,7 +96,7 @@ def get_configs(config_filename):
         'plot_units_time' : discrete_params['plot_units_time'],
 
         'sl' : sl,
-        'dy' :  dy,
+        'dy' :  0.5*sl,
         'vol_grid': vol_grid,
         'plot_units_space' : discrete_params['plot_units_space'],
         'init_segs_count' : discrete_params.getint('init_segs_count'),
@@ -201,7 +201,7 @@ def get_filepath(params):
     # folder_string = "oldD2Tip_Fus_tipRe_brRate1e9_resBr4_noBkDiffLowGluc2_bkPatchy_Trsloc_4init"
     # folder_string = 'recalibration_02242022'
     #folder_string = "noFusion_tipRel_homogenousEnv_convert"
-    folder_string = "noFusion_tipRel_patchy5Env_convert_branch0_4"
+    folder_string = "Fusion_tipRel_patch3Env_initGluc20mm_branch0_3_brCost1x_seg=400"
     # file_string = "{}_b={:.3e}_ieg={}_deg={}_iig={:.3e}_dig={}_vw={}_kyu={},{:.3e},{}_kyc={:.3e},{:.3e},{}_kyg={},{:.3e},{}".format(
     #     folder_string,
     #     params['branch_rate'],
@@ -214,7 +214,8 @@ def get_filepath(params):
     #     params['kg1_wall'], params['Kg2_wall'], params['yield_g'])
     # file_string = "oldD2Tip_Fus_tipRe_brRate1e9_resBr4_noBkDiffLowGluc2_bkPatchy_Trsloc_4init"
     # file_string = "recalibration_02242022"
-    file_string = "noFusion_tipRel_patchy5Env_branch0_4"
+    #file_string = "NoFusion_tipRel_patch3Env_initGluc2um_branch0_3_brCost1x_t1"
+    file_string = "NoFusion_tipRel_homogenousEnv_initGluc20mm_branch0_3_brCost1x_t1"
     #file_string = "noFusion_tipRel_homogenousEnv"
     return folder_string, file_string
 
@@ -302,7 +303,10 @@ def plot_fungus(mycelia, num_total_segs, curr_time, folder_string, param_string,
     elif params['plot_units_time'] == 'seconds':
         plot_time = curr_time
 
-
+    coord_file = open('hyphal_coordinates'+str(plot_time)+'.txt', 'w')
+    for i in range(np.shape(segments)[0]): 
+        print(segments[i],file=coord_file)
+    coord_file.close()
     # Set labels, title, margins, etc.
     # ax.set_ylabel('dm')
     # ax.set_xlabel('dm')
@@ -714,7 +718,7 @@ def plot_fungus_treha(mycelia, num_total_segs, curr_time, folder_string, param_s
     
 #-----------------------------------------------------------------------------
 
-def plot_externalsub(sub_e, yticks, yticklabels, curr_time, sub_e_max, plot_type, folder_string, param_string, params, run):
+def plot_externalsub(sub_e, yticks, y_tick_labels, curr_time, sub_e_max, plot_type, folder_string, param_string, params, run):
     """
     Parameters
     ----------
@@ -765,7 +769,7 @@ def plot_externalsub(sub_e, yticks, yticklabels, curr_time, sub_e_max, plot_type
     # breakpoint()
     # Plot
     if plot_type == 'Se':
-        ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmax=sub_e_max, xticklabels=yticklabels, yticklabels=yticklabels)
+        ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmax=sub_e_max, xticklabels=y_tick_labels, yticklabels=y_tick_labels)
     # elif plot_type == 'Ce':
     #     ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmin=0, xticklabels=yticklabels, yticklabels=yticklabels)
     # breakpoint()
@@ -778,6 +782,8 @@ def plot_externalsub(sub_e, yticks, yticklabels, curr_time, sub_e_max, plot_type
         ax.collections[0].colorbar.set_label("Chemical Inhibitor Concentration")
         ax.set_title('Chemical Domain \nTime = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
 
+    ax.set_xticklabels(y_tick_labels)
+    ax.set(xticklabels=y_tick_labels)
     ax.set_ylabel('{}'.format(params['plot_units_space']))
     ax.set_xlabel('{}'.format(params['plot_units_space']))
     ax.invert_yaxis()
@@ -830,6 +836,7 @@ def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plo
 
     sub_e_max = np.max(sub_e)
 
+
     # For the orange-blue color map
     top = cm.get_cmap('Oranges_r', 256) # r means reversed version
     bottom = cm.get_cmap('Blues', 256)# combine it all
@@ -846,6 +853,11 @@ def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plo
         plot_time = curr_time / 60
     elif params['plot_units_time'] == 'seconds':
         plot_time = curr_time
+
+    thisfile = open('external_concentrations'+str(plot_time)+'.txt', 'w')
+    for i in range(np.shape(sub_e)[0]): 
+        print(sub_e[i],file=thisfile)
+    thisfile.close()
     # breakpoint()
     # Plot
     if plot_type == 'Se':

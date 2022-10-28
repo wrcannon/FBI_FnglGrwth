@@ -4,7 +4,7 @@
 Created on Tue Sep 15 14:32:59 2020
 
 @author: jolenebritton
-@ HUGE assumption: (Kevin) A segment that undergoes fusion cannot create any new branches. A segment that gets fused to, 
+@ Assumption: (Kevin) A segment that undergoes fusion cannot create any new branches. A segment that gets fused to, 
 @                        cannot create any new branches if it has not already done so.
 """
 
@@ -27,7 +27,7 @@ os.chdir(cwd_path)
 
 import helper_functions as hf
 import growth_functions as gf
-import nutrient_functions as nf
+import nutrient_functions2 as nf
 import setup_functions as sf
 
 # Define string constants
@@ -70,7 +70,7 @@ def driver_singleNutrient(run):
     print('dist2Tip_new : ', dist2Tip_new)
     
     # Is the background environment diffusion-capable? 1 = YES, 0 = NO
-    backDiff = 0
+    backDiff = 1
     print('backDiff : ', backDiff)
     
     # Is fungal fusion (anastomosis) active? 1 = YES, 0 = NO
@@ -102,7 +102,7 @@ def driver_singleNutrient(run):
     
     # Is the initial background environment with 'patchy' nutrient distribution?
     # 1 = YES, 0 = NO
-    isPatchyExtEnvironment = 1
+    isPatchyExtEnvironment = 0
     print('isPatchyExtEnvironment : ', isPatchyExtEnvironment)
     if (isPatchyExtEnvironment == 1):
         ## There are currently 5 presets of the non-homogeneous randomized
@@ -110,7 +110,7 @@ def driver_singleNutrient(run):
         ## the set to use.
         ## setBackground = 1,2,3 have 50 nutrient foci
         ## setBackground = 4,5 have 100 nutrient foci
-        setBackground = 5
+        setBackground = 3
     
     # Is the cell wall convection (active transport) scaled by local metabolism 
     # activity? 1 = YES, 0 = NO
@@ -144,16 +144,27 @@ def driver_singleNutrient(run):
     else:
         x_vals, y_vals, sub_e_gluc, sub_e_treha = sf.external_grid_patchy(setBackground)
     
+    thisfile = open('grid_coordinates.txt','w')
+    for i in range(np.shape(x_vals)[0]): 
+        print(x_vals[i],y_vals[i],file=thisfile)
+    thisfile.close()
+    
     # Plotting label scaling parameters for external domain
     num_ticks = 11 # number of tick labels to appear
     yticks = np.linspace(0, len(x_vals)-1, num_ticks, dtype=np.int)
-    yticklabels = np.around(np.linspace(-sl*params['grid_scale_val'], sl*params['grid_scale_val'], num_ticks),3)
-    
+    yticklabels = np.around(np.linspace(-sl*params['grid_scale_val'], sl*params['grid_scale_val'], num_ticks),3) 
+
     # File path for saving results
     folder_string, param_string = hf.get_filepath(params)
     if not os.path.exists('Results/{}/Run{}'.format(param_string, run)):
         os.makedirs('Results/{}/Run{}'.format(param_string, run))
     
+    # Plot the initial nutrient background:
+    glucose_ext = sub_e_gluc/params['vol_grid']*1e12 # Convert to molar quantities for display
+    max_e_gluc = np.max(glucose_ext)
+    hf.plot_externalsub(sub_e_gluc, yticks, yticklabels, 0.0, max_e_gluc, 'Se', folder_string, param_string, params, run)
+
+
     # Save copy of the parameters used
     params_file = 'Results/{}/Run{}/{}_params.ini'.format(param_string,
                                                           run,
@@ -166,6 +177,7 @@ def driver_singleNutrient(run):
     count_tips = []
     count_radii = []
     count_times = []
+    count_biomass = []
     total_length_progression = []
     
     
@@ -205,7 +217,7 @@ def driver_singleNutrient(run):
     #hf.plot_fungus_gluc(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
     #hf.plot_fungus_generic(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
     
-    
+    print_increment = 1
     while current_time < params['final_time']: 
         # if current_time > 0 and num_total_segs >= 20:
         #     print('Simulation terminated due to maximal segment number limit reached.')
@@ -296,7 +308,9 @@ def driver_singleNutrient(run):
         #    breakpoint()
 
         tB_0 = time.time()
-        
+        if (current_time > 345600):
+            bob = 1
+
         old_num_total_segs = num_total_segs 
         if any(np.where(mycelia['can_branch'])[0]):
             mycelia, num_total_segs, dtt = gf.branching(mycelia, 
@@ -318,13 +332,20 @@ def driver_singleNutrient(run):
             num_branch = np.max(mycelia['branch_id'][:num_total_segs])
             print('Current number of active segments : ', len(num_seg))
             print('Current number of active branch : ', (num_branch))
-            
-               
-        
 
-                
+        #if(current_time > 24*3600*10):
+        #    grd_density = sf.grid_density(mycelia, sub_e_gluc, num_total_segs) 
+        #    print('Max grid density = ', np.max(grd_density))
+        
+        print_time = 4*3600*print_increment # print every 4 hours
         # PLOT & SAVE DATA
-        if current_step % (4*160) == 0: 
+        if (current_time > print_time):
+            print_increment = print_increment+1        
+            if(current_time > 24*3600*10):
+                grd_density = sf.grid_density(mycelia, sub_e_gluc, num_total_segs) 
+                print('Max grid density = ', np.max(grd_density))
+
+        # if current_step % (4*160) == 0: 
         # if current_step % (1*160) == 0:
             # breakpoint()
             hf.plot_fungus(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
@@ -362,6 +383,8 @@ def driver_singleNutrient(run):
             count_tips.append(np.count_nonzero(mycelia['is_tip']))
             count_radii.append(max(np.sqrt(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2)))
             count_times.append(current_time)
+            total_biomass = np.sum(mycelia['seg_length'])*params['cross_area']*params['hy_density']
+            count_biomass.append(total_biomass)
             
             N = round(len(x_vals)/2)-2
         
@@ -648,7 +671,84 @@ def driver_singleNutrient(run):
             #         avg_treha_annulus[i] = avg_treha_annulus[i]/count
             #         max_treha_annulus[i] = max_treha
             #         min_treha_annulus[i] = min_treha
-            # breakpoint()            
+            # breakpoint() 
+                # ----------------------------------------------------------------------------
+            
+            # Write Current RESULTS to CSV
+            # ----------------------------------------------------------------------------
+            t_1 = time.time()
+            num_branches = max(mycelia['branch_id'])[0]+1
+            num_segs = num_total_segs
+            num_tips = np.count_nonzero(mycelia['is_tip'])
+            max_radii = max(np.sqrt(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2))
+            time_total = t_1 - t_0
+            time_mins, time_secs = divmod(time_total, 60)
+            min_seg_length_nonTipIdx = (np.where(mycelia['is_tip'][:num_total_segs] == False))[0]
+            min_seg_length_nonTipIdx2 = (np.where(mycelia['branch_id'][min_seg_length_nonTipIdx] != -1))[0]
+            max_seg_length = max(mycelia['seg_length'])[0]
+            min_seg_length = 0.0
+            if np.any(mycelia['seg_length'][min_seg_length_nonTipIdx[min_seg_length_nonTipIdx2]]):
+                min_seg_length = min(mycelia['seg_length'][min_seg_length_nonTipIdx[min_seg_length_nonTipIdx2]])
+            # breakpoint()
+            potential_CFL_fail_segment = np.where(mycelia['seg_length'][:num_total_segs] < params['dt']*params['kg1_wall'])[0]
+            CFL_fail_segment = len(np.where(mycelia['is_tip'][potential_CFL_fail_segment] == False)[0])
+            #total_biomass = np.sum(mycelia['seg_length'])*params['cross_area']*params['hy_density']
+    
+            #count_branches.append(num_branches)
+            #count_tips.append(num_tips)
+            #count_radii.append(max_radii)
+            #count_times.append(current_time)
+            #count_biomass.append(total_biomass)
+    
+            #count_branches = np.array(count_branches)
+            #count_tips = np.array(count_tips)
+            #count_radii = np.array(count_radii)
+            #count_times = np.array(count_times)
+            #count_biomass = np.array(count_biomass)
+            #avg_treha_annulus = np.array(avg_treha_annulus)
+            #max_treha_annulus = np.array(max_treha_annulus)
+            #min_treha_annulus = np.array(min_treha_annulus)
+    
+            output_dict = {
+                'run_num' : run,
+                'total_run_time': t_1-t_0,
+                'array_times' : count_times,
+                'total_biomass' : count_biomass,
+                'array_num_branches' : count_branches,
+                'array_num_tips' : count_tips,
+                'array_branching_density' : np.array(count_branches)/count_tips,
+                'array_radii' : count_radii,
+                'num_segments_at_end' : num_segs,
+                'max_seg_length' : max_seg_length,
+                'min_seg_length_nonTip' : min_seg_length,
+                'CFL_fail_segment ' : CFL_fail_segment,
+                'isCalibration ': isCalibration,
+                'dist2Tip_new ': dist2Tip_new,
+                'backDiff ': backDiff,
+                'fungal_fusion' : fungal_fusion,
+                'isTipRelease' : isTipRelease,
+                'isActiveTrans' : isActiveTrans,
+                'whichInitialCondition' : whichInitialCondition,
+                'restrictBranching' : restrictBranching,
+                'isPatchyExtEnvironment' : isPatchyExtEnvironment,
+                'isConvectDependOnMetabo_cw' : isConvectDependOnMetabo_cw,
+                'isConvectDependOnMetabo_gluc' : isConvectDependOnMetabo_gluc,
+                'isConvectDependOnMetabo_treha' : isConvectDependOnMetabo_treha,
+                'chance_to_fuse' : chance_to_fuse,
+                'total_length_progression' : np.array(total_length_progression),
+                'avg_treha_annulus' : avg_treha_annulus,
+                'max_treha_annulus' : max_treha_annulus,
+                'min_treha_annulus' : min_treha_annulus}
+            output_file_csv = "Results/{}/Run{}/{}_outputdata_{}.csv".format(param_string, 
+                                                                      run, 
+                                                                      param_string, 
+                                                                      run)
+            with open(output_file_csv, 'w') as csv_file:  
+                writer = csv.writer(csv_file)
+                for key, value in output_dict.items():
+                    writer.writerow([key, value])
+            
+            # end xxx           
             
             WWWW = np.where(avg_treha_annulus == np.max(avg_treha_annulus))[0]
             print('Max avg treha at contour : ', WWWW)
@@ -659,7 +759,9 @@ def driver_singleNutrient(run):
             # breakpoint()
         current_time += dt
         current_step += 1
-        
+        # end
+
+    # end
     
     
     # Plot results at final time
@@ -851,16 +953,19 @@ def driver_singleNutrient(run):
     # breakpoint()
     potential_CFL_fail_segment = np.where(mycelia['seg_length'][:num_total_segs] < params['dt']*params['kg1_wall'])[0]
     CFL_fail_segment = len(np.where(mycelia['is_tip'][potential_CFL_fail_segment] == False)[0])
+    total_biomass = np.sum(mycelia['seg_length'])*params['cross_area']*params['hy_density']
     
     count_branches.append(num_branches)
     count_tips.append(num_tips)
     count_radii.append(max_radii)
     count_times.append(current_time)
+    count_biomass.append(total_biomass)
     
     count_branches = np.array(count_branches)
     count_tips = np.array(count_tips)
     count_radii = np.array(count_radii)
     count_times = np.array(count_times)
+    count_biomass = np.array(count_biomass)
     avg_treha_annulus = np.array(avg_treha_annulus)
     max_treha_annulus = np.array(max_treha_annulus)
     min_treha_annulus = np.array(min_treha_annulus)
@@ -915,6 +1020,7 @@ def driver_singleNutrient(run):
         'run_num' : run,
         'total_run_time': t_1-t_0,
         'array_times' : count_times,
+        'total_biomass' : count_biomass,
         'array_num_branches' : count_branches,
         'array_num_tips' : count_tips,
         'array_branching_density' : count_branches/count_tips,
