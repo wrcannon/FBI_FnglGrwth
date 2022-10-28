@@ -519,12 +519,24 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
         nbr_length = seg_lengths[nbr_curr[idx]]
         nbr_volume = seg_volume[nbr_curr[idx]]
         volume_use_gluc = np.zeros((len(nbr_curr[idx]),1))
-        volume_use_gluc[(delta_gluc_conc_nbrs < 0)] = nbr_volume[(delta_gluc_conc_nbrs < 0)]
-        volume_use_gluc[(delta_gluc_conc_nbrs >= 0)] = seg_volume[idx]
+
+        # Determine whether to remove material from the neighbor or from the current segment:
+        volume_use_gluc[(delta_gluc_conc_nbrs > 0)] = nbr_volume[(delta_gluc_conc_nbrs > 0)]
+        volume_use_gluc[(delta_gluc_conc_nbrs <= 0)] = seg_volume[idx]
+
+        # Count of the Number of Neighbors (cnn) that neighbors of idx have:
+        nn = np.zeros((len(nbr_curr[idx]),1))
+        cnn = [len(nbr_curr[i]) for i in nbr_of_idx]
+        nn[(delta_gluc_conc_nbrs > 0)] = cnn[(delta_gluc_conc_nbrs > 0)]
+        nn[(delta_gluc_conc_nbrs <= 0)] = len(nbr_of_idx)
+        # The amount taken from a cell must be split amoung its neighbors, so
+        # that the amount taken doesn't exceed the total available.
+        # Likewise the amount added to a cell is only a fraction of what is transported out of the neighbor
+        degeneracy_gluc = 1/nn
 
         volume_use_treha = np.zeros((len(nbr_curr[idx]),1))
-        volume_use_treha[(delta_treha_conc_nbrs < 0)] = nbr_volume[(delta_treha_conc_nbrs < 0)]
-        volume_use_treha[(delta_treha_conc_nbrs >= 0)] = seg_volume[idx]
+        volume_use_treha[(delta_treha_conc_nbrs > 0)] = nbr_volume[(delta_treha_conc_nbrs > 0)]
+        volume_use_treha[(delta_treha_conc_nbrs <= 0)] = seg_volume[idx]
 
         # The distance of transport is assumed to be half the segment length of the current segment 
         # and half of the previous segment. 
@@ -533,7 +545,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
         # d2gluc_dx2[idx] = np.sum(delta_gluc_conc_nbrs/nbr_dist_sqr) would be the total change in concentration
         # due to diffusion. But we need to know what the change in counts are. So multiply the change in concentration 
         # due to each neighbor by the volume of the compartment that is losing concentration.
-        d2gluc_dx2[idx] =  np.sum(delta_gluc_conc_nbrs/nbr_dist_sqr*volume_use_gluc)
+        d2gluc_dx2[idx] =  np.sum(degeneracy_gluc*delta_gluc_conc_nbrs/nbr_dist_sqr*volume_use_gluc)
         d2treha_dx2[idx] =  np.sum(delta_treha_conc_nbrs/nbr_dist_sqr*volume_use_treha)
 
     to_nbrs = np.array(to_nbrs)
@@ -560,7 +572,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
         print('Indices:',negative_gluc_i_idx)
         print('Segment lengths:',mycelia['seg_length'][negative_gluc_i_idx])
         mycelia['gluc_i'][negative_gluc_i_idx] = np.finfo(np.float64).tiny;
-        breakpoint()
+        #breakpoint()
     negative_treha_i_idx = np.where(mycelia['treha_i'][:num_total_segs] < 0)[0]
 
     mycelia_before = mycelia['treha_i'][:num_total_segs].copy()
@@ -712,9 +724,12 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
             # Change to counts taking from teh correct segment volume
             cw_delta_count[idx] = np.sum(cw_from_scaled_nbrs*from_nbr_volume) - cw_curr_mod[idx]*seg_volume[idx]
             exprt_amt = (len(to_nbrs[idx]) > 0) * 1.0
+            # Advection without taking into account metabolism due to glucose
             cw_convect_term[idx] = advection_vel_cw* \
-                (np.sum(1/len_to_nbrs[from_nbrs_idx]*alpha_cw[from_nbrs_idx]*alpha_gluc[from_nbrs_idx])-exprt_amt*alpha_cw[idx]*alpha_gluc[idx])
-            
+                (np.sum(1/len_to_nbrs[from_nbrs_idx]*alpha_cw[from_nbrs_idx])-exprt_amt*alpha_cw[idx])
+            # Advection taking into account metabolism due to glucose
+            #cw_convect_term[idx] = advection_vel_cw* \
+            #    (np.sum(1/len_to_nbrs[from_nbrs_idx]*alpha_cw[from_nbrs_idx]*alpha_gluc[from_nbrs_idx])-exprt_amt*alpha_cw[idx]*alpha_gluc[idx])
             if np.isnan(cw_delta_count[idx]):
                 breakpoint()
      

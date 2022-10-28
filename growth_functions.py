@@ -102,8 +102,9 @@ def map_to_grid(mycelia, idx, num_total_segs, x_vals, y_vals):
     coordinates. Note if multiples segments are mapped to the same external grid
     point.
     """
-
+    # Include self in list of shared endpoints
     mycelia['share_e'][idx] = [idx]
+    # Get the index of the external grid point
     xy_e = np.array([int(np.argmin(abs(mycelia['xy1'][idx,0]-x_vals))),int(np.argmin(abs(mycelia['xy1'][idx,1]-y_vals)))])
     # print(xy_e)
     if xy_e is None:
@@ -638,7 +639,20 @@ def extension(mycelia, num_total_segs, dtt, x_vals, y_vals,
     the structural information and checks for septation and segment splitting.
     """
 
-    tip_idxs = np.where(mycelia['is_tip'])[0]
+    tip_idxs = (np.where(mycelia['is_tip'])[0]).tolist()
+    # Get the number density of segments around each segment 
+    ndensity = [len(i) for i in mycelia['share_e'][:num_total_segs]]
+    # Find those segments that have greater than half of their grid filled by other segments
+    # But apply density filtering only after initial tips have segmented
+    if 3 not in tip_idxs:
+        #fidx = np.where(ndensity < np.int_(3))
+        fidx = np.where(ndensity <= np.int64(params['dy']/params['hy_diam']*0.2))
+        # Don't allow segments in high density regions to grow
+        tip_idxs = list(set(tip_idxs) & set(fidx[0]))
+
+    # Check to see if the list is empty, and if so, return
+    if not tip_idxs:
+        return mycelia, num_total_segs, dtt
 
     use_original = 0
     if(use_original == 1):
@@ -732,16 +746,27 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals,
     Driver function for branching - determines which segments branch, updates
     the structural information.
     """
-    
+
+    # Get the number density of segments around each segment 
+    ndensity = [len(i) for i in mycelia['share_e'][:num_total_segs]]
+    # Find those segments that have greater than half of their grid filled by other segments
+    fidx = np.where(ndensity > np.int64(params['sl']/params['hy_diam']*0.2))
+    #fidx = np.where(ndensity[4:] > np.int_(2))
+    # Don't allow segments in high density regions to branch
+    mycelia['can_branch'][fidx] = False
     use_original = 0
     if (restrictBranching == 0):
-        potential_branch_idxs = np.where(mycelia['can_branch'])[0]
+        potential_branch_idxs = (np.where(mycelia['can_branch'])[0])
     else:
         tmp_potential_branch_idxs = np.where(mycelia['can_branch'])[0]
         restricting = np.where(dtt[tmp_potential_branch_idxs]<=restrictBranching)[0]
-        potential_branch_idxs = tmp_potential_branch_idxs[restricting]
+        potential_branch_idxs = (tmp_potential_branch_idxs[restricting])
         # if np.max(num_total_segs > 8):
         #     breakpoint()
+
+    if not np.any(potential_branch_idxs):
+        return mycelia, num_total_segs, dtt
+
     if(use_original == 1):
         rand_vals = np.random.uniform(0, 1, (len(potential_branch_idxs),1))
         # print('rand_vals : ', rand_vals)
@@ -749,21 +774,39 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals,
         true_branch_ids = potential_branch_idxs[np.where((rand_vals - params['branch_rate']*mycelia['cw_i'][potential_branch_idxs]) < 0)[0]]
         
     else:
+        advection_vel_cw = params['advection_vel_cw']
+        K_cw = advection_vel_cw*params['dt']
+        alpha_cw = michaelis_menten(1, K_cw, 
+                                mycelia['cw_i'][:num_total_segs])
+        nutrient_scaling = 1.0 #rich media
+        nutrient_scaling = 0.1 #minimal media
+        prob = alpha_cw * nutrient_scaling
+        #true_idx = np.where((prob - rand_vals).flatten() > 0)
+        
         #print('potential_branch_idxs = ', potential_branch_idxs)
         branch_len = params['dt']*michaelis_menten(params['kg1_wall'],
                                                        params['Kg2_wall'],
                                                        mycelia['cw_i'][potential_branch_idxs])
-        branch_len, cost_branch_gluc, cost_branch_cw = cost_of_growth(mycelia, potential_branch_idxs, branch_len)
-        cost_multiple = 1.0#0.5
-        prob = 1.0 - np.exp(-(mycelia['cw_i'][potential_branch_idxs] - cost_multiple*cost_branch_cw)/(cost_multiple*cost_branch_cw))
-        # prob = 1.0 - 1.5*np.exp(-(mycelia['cw_i'][potential_branch_idxs] - cost_multiple*cost_branch_cw)/(cost_multiple*cost_branch_cw))
+        len0 = params['kg1_wall']*params['dt']
+        branch_len0 = np.ones((len(potential_branch_idxs),1))*len0
+        branch_len, cost_branch_gluc, cost_branch_cw = cost_of_growth(mycelia, potential_branch_idxs, branch_len0)
+        cost_multiple = 4.0#0.5
+        # prob = 1.0 - np.exp(-(mycelia['cw_i'][potential_branch_idxs] - cost_multiple*cost_branch_cw)/(cost_multiple*cost_branch_cw))
+        #prob = np.exp((branch_len-1*branch_len0)/branch_len0)
+
+        
+        #prob = michaelis_menten(1,params['Kg2_wall'],mycelia['cw_i'][potential_branch_idxs])
         rand_vals = np.random.uniform(0, 1, (len(potential_branch_idxs),1))
-        true_idx = np.where((prob - rand_vals).flatten() > 0)
-        # true_idx = np.where((0.1*prob - rand_vals).flatten() > 0)
+        #rand_vals = np.ones((len(potential_branch_idxs),1))* 0.5
+        #true_idx = np.where((prob - rand_vals).flatten() > 0)
+        true_idx = np.where(mycelia['dist_from_center'][potential_branch_idxs] >= 0.5*max(mycelia['dist_from_center'][:num_total_segs][0]))[0]
+
+        # true_idx = np.where((prob - rand_vals).flatten() > 0)
         true_branch_ids = potential_branch_idxs[true_idx]
         branch_len =  branch_len[true_idx]
         cost_branch_cw =  cost_branch_cw[true_idx]
         cost_branch_gluc =  cost_branch_gluc[true_idx]
+    
 
         
     if any(true_branch_ids):
@@ -1194,12 +1237,13 @@ def anastomosis(mycelia, idx, num_total_segs, chance_to_fuse):
                     new_seg_len = calc_dist(mycelia['xy1'][idx,:], mycelia['xy2'][idx,:])
                     short_multi_seg_fuse = False
 
+                    print('Fusing in anastomosis')
                     # If the segment is long enough (satisfies CFL), proceed normally
                     if new_seg_len >= params['dt']*params['kg1_wall']:
-                        # print('Fusion between segments of two branches resulting a CFL-satisfying segment.')
                         mycelia['seg_length'][idx] = new_seg_len
                         mycelia['is_tip'][idx] = False
                         mycelia['can_branch'][idx] = True
+                        print('Fusion between segments of two branches resulting a CFL-satisfying segment:', new_seg_len)
                         mycelia = set_anastomosis_nbrs(mycelia, idx, target_idx, seg_fuse, short_multi_seg_fuse)
                         # Rename the endpoints of the current hyphae segment
                         xy2_c = mycelia['xy2'][idx,:]
@@ -1464,7 +1508,8 @@ def get_box(xy1, xy2, box_size):
 
     # Define zone to look for interections in
     minx = min(xy1[0], xy2[0]) - box_size
-    maxx = min(xy1[0], xy2[0]) + box_size
+    maxx = max(xy1[0], xy2[0]) + box_size
+    # maxx = min(xy1[0], xy2[0]) + box_size This looks like a typo - should be max(...)?
     miny = min(xy1[1], xy2[1]) - box_size
     maxy = max(xy1[1], xy2[1]) + box_size
 
@@ -1588,18 +1633,20 @@ def set_anastomosis_nbrs(mycelia, idx, other_idx, seg_fuse, short_multi_seg_fuse
         Updated structural information of mycelia colony for all hyphal segments.
 
     """
-    # print('set anastomosis nbrs information')
+    
     # Save neighbor information
     if short_multi_seg_fuse == True:
         mycelia['nbr_idxs'][idx].append(other_idx)
         mycelia['nbr_idxs'][other_idx].append(idx)
         mycelia['nbr_num'][idx] += 1
         mycelia['nbr_num'][other_idx] += 1
+        print('short_multi_seg_fuse == True')
     else:
         mycelia['nbr_idxs'][idx].append(other_idx)
         mycelia['nbr_idxs'][other_idx].append(idx)
         mycelia['nbr_num'][idx] += 1
         mycelia['nbr_num'][other_idx] += 1
+        print('short_multi_seg_fuse == False')
         # mycelia['nbr_idxs'][other_idx].remove(idx)
         # mycelia['nbr_num'][other_idx] -= 1
 
@@ -1610,8 +1657,10 @@ def set_anastomosis_nbrs(mycelia, idx, other_idx, seg_fuse, short_multi_seg_fuse
             # breakpoint()
         if mycelia['branch_id'][idx]>-1:
             mycelia['nbr_idxs'][seg_fuse].remove(idx)
+            mycelia['nbr_idxs'][idx].remove(seg_fuse)
             # mycelia['nbr_num'][idx] -= 1
-            mycelia['nbr_num'][seg_fuse] -= 1        
+            mycelia['nbr_num'][seg_fuse] -= 1
+            print('Remove neighbor connection if needed')        
     
         # mycelia['nbr_idxs'][seg_fuse].remove(idx)
 
