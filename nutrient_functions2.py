@@ -412,7 +412,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
     seg_lengths = mycelia['seg_length'][:num_total_segs]
     seg_volume = seg_lengths*params['cross_area']
     gluc_curr_concentrations = gluc_curr/seg_volume
-    
+
     if(np.any(gluc_curr < 0)):
         print('Glucose below 0.0:',np.min(gluc_curr))
         breakpoint()
@@ -441,6 +441,8 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
     
     # Calculate neighbor lists and simultaneously determine diffusion
     for idx in range(num_total_segs):
+        if(idx == 35367):
+            xc = 1
 
         delta_gluc_conc_nbrs = delta_gluc_conc_nbrs*0.0
         nbr_length = nbr_length*0.0
@@ -450,6 +452,8 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
         nbr_dist_sqr = nbr_dist_sqr*0.0
         
         nbr_of_idx = np.array(nbr_curr[idx])
+        if 35367 in nbr_of_idx:
+            xc = 1
           
         if (mycelia['bypass'][idx]==True):
             to_nbrs.append([])
@@ -480,7 +484,8 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
         else:
             to_nbrs.append([])
 
-        # Find the immediate neighbors that are further from tip:        
+        # Find the immediate neighbors that are further from tip.
+        # A hyphal segment will accept flow from these neighbors        
         if len(np.where(dtt[nbr_of_idx] > dtt[idx])[0]) and (mycelia['branch_id'][idx])>-1:
             chosen_idx = np.array(np.where(dtt[nbr_of_idx] > dtt[idx])[0])
             
@@ -510,16 +515,21 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
         else:
             from_nbrs.append([])
 
-        # This is the total count of gluc_i in neighbors of idx, not concentrations!
+        # This is the total count of gluc_i (glucose) in neighbors of idx, not concentrations!
         gluc_nbrs[idx] = np.sum(mycelia['gluc_i'][nbr_curr[idx]]) 
         treha_nbrs[idx] = np.sum(mycelia['treha_i'][nbr_curr[idx]])
         
+        # These are concentrations:
         delta_gluc_conc_nbrs = gluc_curr_concentrations[nbr_curr[idx]] - gluc_curr_concentrations[idx]
         delta_treha_conc_nbrs = treha_curr_concentrations[nbr_curr[idx]] - treha_curr_concentrations[idx]
 
+        # If the concentration of the neighbors is higher than teh concentration of idx, then the net flow
+        # is out of idx to neighbors
+        # diffuse2nbrs is True/False flag for which neigbors to diffuse to
         diffuse2nbrs = [(delta_gluc_conc_nbrs < 0)]
         frxn_delta_gluc_conc2nbrs = np.zeros((len(nbr_curr[idx]),1))
         total_delta_gluc_conc_nbrs = np.sum(delta_gluc_conc_nbrs[diffuse2nbrs])
+        # Determine the frxn of glucose in idx that will go to neighbors
         frxn_delta_gluc_conc2nbrs[diffuse2nbrs] = delta_gluc_conc_nbrs[diffuse2nbrs] \
             /total_delta_gluc_conc_nbrs
 
@@ -564,8 +574,8 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
         #d2gluc_dx2[nbr_of_idx] = d2gluc_dx2[nbr_of_idx] \
         #                    -frxn_delta_gluc_conc2nbrs*delta_gluc_conc_nbrs \
         #                    /nbr_dist_sqr *volume_use_gluc
-        d2gluc_dx2[nbr_of_idx] =  d2gluc_dx2[nbr_of_idx] - np.sum(delta_gluc_conc_nbrs*volume_use_gluc/seg_volume[idx] \
-                            /nbr_dist_sqr )
+        d2gluc_dx2[nbr_of_idx] =  d2gluc_dx2[nbr_of_idx] - delta_gluc_conc_nbrs*volume_use_gluc/seg_volume[idx] \
+                            /nbr_dist_sqr
 
         #d2treha_dx2[idx] =  np.sum(delta_treha_conc_nbrs/nbr_dist_sqr*volume_use_treha)
 

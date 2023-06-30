@@ -216,11 +216,12 @@ def driver_singleNutrient(run):
     #hf.plot_fungus(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
     #hf.plot_fungus_gluc(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
     #hf.plot_fungus_generic(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
-    restart = 1
+    restart = 0
     if (restart == 1):
-            file = open('restart.pkl','rb')
+            file = open('restart0.pkl','rb')
             mycelia = pickle.load(file)
             num_total_segs = pickle.load(file)
+            dtt = pickle.load(file)
             sub_e_gluc = pickle.load(file)
             sub_e_treha = pickle.load(file)
             current_time = pickle.load(file)
@@ -358,6 +359,7 @@ def driver_singleNutrient(run):
             file = open('restart.pkl','wb')
             pickle.dump(mycelia,file)
             pickle.dump(num_total_segs,file)
+            pickle.dump(dtt,file)
             pickle.dump(sub_e_gluc,file)
             pickle.dump(sub_e_treha,file)
             pickle.dump(current_time,file)
