@@ -11,6 +11,7 @@ import numpy as np
 import helper_functions as hf
 import nutrient_functions as nf
 import growth_functions as gf
+import math 
 
 params, config = hf.get_configs('parameters.ini')
 
@@ -65,7 +66,7 @@ def mycelia_dict():
     print('max_num_segs : ', max_num_segs)
     
     # Max number of hyphal branches - convert to function of final time?
-    max_num_branches = 60000#20000#10000 #5000
+    max_num_branches = 160000#20000#10000 #5000
     print('max_num_branches : ', max_num_branches)
     
     # Max total number of segments in fungal colony
@@ -346,6 +347,9 @@ def external_grid():
 def external_grid_patchy(set):
     # Define external domain grid
     scale_val = params['grid_scale_val']
+    # Number of grid x points = 2*params['sl']*scale_val/params['dy'] + 1:
+    # Total number of grids: (2*params['sl']*scale_val/params['dy'] + 1)^2
+    # Range of grids: +/-params['sl']*scale_val
     x_vals = np.arange(-params['sl']*scale_val, params['sl']*scale_val+params['dy'], params['dy'])
     y_vals = np.arange(-params['sl']*scale_val, params['sl']*scale_val+params['dy'], params['dy'])
     xe, ye = np.meshgrid(x_vals, y_vals)
@@ -359,15 +363,17 @@ def external_grid_patchy(set):
     ## Note that for this type of initial condition, we want the nutrient 
     ## distribution to cover roughly 30% of the domain. This 30% will be 
     ## calculated using the number of grid points. 
-    ## So x_vals describes how many grid points on on the x-direction and 
+    ## x_vals describes how many grid points on on the x-direction and 
     ## similarly for y_vals.
     ## Depending on how big each "focus" of the nutrient spots, we need to 
     ## adjust its "radius" (M in the later part of the function).
+    # In other words, the width of each patch of nutrient is determined by the variable M.
+    # The width of a patch is M*params['dy']
     
     ## For grid_scale_val = 80
     if (set == 1):
         ## Set 1
-        M = 9 # "radius" of each focus of nutrient spots
+        M = 9 # width of each focus of nutrient spots
         r1 = [round(len(x_vals)/2),   210,    51,    69,    43,
         41,   201,   138,   131,    43,
        198,   147,    88,   123,    99,
@@ -440,7 +446,7 @@ def external_grid_patchy(set):
     if (set == 4):
         ## Set 4
         M = 4
-        r1 = [round(len(x_vals)/2),  156 ,   48 ,   75 ,  220 ,   77,    17 ,  152 ,   66 ,  210,
+        r1 = [round(len(x_vals)/2),  156 ,   48 ,   75 ,  220 ,   77,    17 ,  152 ,   66 ,  #210,
            161 ,  125 ,   96 ,  105 ,  213 ,  165 ,  134 ,   93,    74 ,  204,
             19 ,  225 ,  194 ,   13 ,   22 ,  157 ,  205 ,   52,   146 ,  191,
             26 ,  153 ,  188 ,  227 ,  173 ,  129 ,  158 ,  105,    69 ,   68,
@@ -485,8 +491,22 @@ def external_grid_patchy(set):
             10,   137,   207,   197,    37,   128,   102,   216,    49,    16,
            201,   197,   227,    56,    55,   108,    56,   171,    98,   196]
      
+     # r1, r2 were set up for a 241x241 grid with a grid width of 20 microns
+    nrows = len(xe)
+    ngrids = nrows*nrows
+    np_array_r1 = np.array(r1)
+    np_array_r2 = np.array(r2)
+    r1[1:] = (np.int_(2*np.round(np_array_r1[1:]* (np_array_r1[0])/240))).tolist() 
+    r2[1:] = (np.int_(2*np.round(np_array_r2[1:]* (np_array_r2[0])/240))).tolist() 
+    #r1[1:] = (np.int_(np.round(np_array_r1[1:]* (ngrids-1)/(240*240)))).tolist() 
+    #r2[1:] = (np.int_(np.round(np_array_r2[1:]* (ngrids-1)/(240*240)))).tolist() 
+
+     # M was originally set up for a grid width of 20
+    M = np.int_(2*np.round(M*np_array_r1[0]/240)) #*params['dy']/20))
+    #M = np.int_(round(M*(ngrids-1)/(240*240)*params['dy']/20))
     
     for i in range(len(r1)):
+        print(i)
         center_x = r1[i]
         center_y = np.flip(r2[i])
         for j in range(M):
@@ -502,6 +522,12 @@ def external_grid_patchy(set):
                 
     return x_vals, y_vals, sub_e_gluc, sub_e_treha
             
-            
+def grid_density(mycelia, sub_e_gluc, num_total_segments):
+    count = np.zeros(sub_e_gluc.shape)
+    for i in range(num_total_segments):
+        tpl = tuple(np.int_(mycelia['xy_e_idx'][i]))
+        count[tpl] = count[tpl] +1
+    return count
+
             
             

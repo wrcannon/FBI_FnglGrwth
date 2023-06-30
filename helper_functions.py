@@ -151,12 +151,15 @@ def get_configs(config_filename):
 
         'num_v' : nutrient_params.getfloat('num_v')
     }
-    kc1_gluc = params_dict['kg1_wall']*params_dict['cross_area']*params_dict['hy_density']*params_dict['f_dw']*params_dict['f_wall']*params_dict['f_cw_cellwall'] \
-        /(params_dict['mw_cw']*params_dict['yield_c'])*1.0e+03
-    #params_dict['kc1_gluc'] = kc1_gluc
+    kc1_gluc = params_dict['kg1_wall']*params_dict['cross_area']*params_dict['hy_density']\
+                *params_dict['f_dw']*params_dict['f_wall']*params_dict['f_cw_cellwall'] \
+                /(params_dict['mw_cw']*params_dict['yield_c'])*1.0e+03
+    params_dict['kc1_gluc'] = kc1_gluc
 
-    if not('yield_c_in_mmoles' in params_dict):
-    	params_dict['yield_c_in_mmoles'] = params_dict['yield_c']*params_dict['mw_glucose']/params_dict['mw_cw']
+    #if not('yield_c_in_mmoles' in params_dict):
+    #	params_dict['yield_c_in_mmoles'] = params_dict['yield_c']*params_dict['mw_glucose']/params_dict['mw_cw']
+    params_dict['yield_c_in_mmoles'] = params_dict['yield_c']*params_dict['mw_glucose']/params_dict['mw_cw']
+    
     use_original = 0
 
     if(use_original != 1):
@@ -201,7 +204,8 @@ def get_filepath(params):
     # folder_string = "oldD2Tip_Fus_tipRe_brRate1e9_resBr4_noBkDiffLowGluc2_bkPatchy_Trsloc_4init"
     # folder_string = 'recalibration_02242022'
     #folder_string = "noFusion_tipRel_homogenousEnv_convert"
-    folder_string = "Fusion_tipRel_patch3Env_initGluc20mm_branch0_3_brCost1x_seg=400"
+    #folder_string = "NoFusion_NoTipRel_homogenousEnv_initGluc20mm_branch0_3_brCost1x_seg=400"
+    folder_string = "NoFusion_NoTipRel_homogenousEnv_initGluc20mm_branch0_3_brCost1x_t1"
     # file_string = "{}_b={:.3e}_ieg={}_deg={}_iig={:.3e}_dig={}_vw={}_kyu={},{:.3e},{}_kyc={:.3e},{:.3e},{}_kyg={},{:.3e},{}".format(
     #     folder_string,
     #     params['branch_rate'],
@@ -215,7 +219,7 @@ def get_filepath(params):
     # file_string = "oldD2Tip_Fus_tipRe_brRate1e9_resBr4_noBkDiffLowGluc2_bkPatchy_Trsloc_4init"
     # file_string = "recalibration_02242022"
     #file_string = "NoFusion_tipRel_patch3Env_initGluc2um_branch0_3_brCost1x_t1"
-    file_string = "NoFusion_tipRel_homogenousEnv_initGluc20mm_branch0_3_brCost1x_t1"
+    file_string = "NoFusion_AllHyphRel_homogenousEnv_initGluc20mm_branch0_3_brCost1x_t1_v2"
     #file_string = "noFusion_tipRel_homogenousEnv"
     return folder_string, file_string
 
@@ -784,6 +788,9 @@ def plot_externalsub(sub_e, yticks, y_tick_labels, curr_time, sub_e_max, plot_ty
 
     ax.set_xticklabels(y_tick_labels)
     ax.set(xticklabels=y_tick_labels)
+    ax.set_yticklabels(y_tick_labels)
+    ax.set(yticklabels=y_tick_labels)
+    
     ax.set_ylabel('{}'.format(params['plot_units_space']))
     ax.set_xlabel('{}'.format(params['plot_units_space']))
     ax.invert_yaxis()
@@ -799,8 +806,9 @@ def plot_externalsub(sub_e, yticks, y_tick_labels, curr_time, sub_e_max, plot_ty
                                                                         curr_time,
                                                                         plot_type,
                                                                         run)
+    plt.tight_layout()
     fig = ax.get_figure()
-    fig.savefig(fig_name)
+    fig.savefig(fig_name, bbox_inches="tight")
     plt.close()
 
 def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plot_type, folder_string, param_string, params, run):
@@ -868,6 +876,9 @@ def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plo
     # breakpoint()
     ax.set_yticks(yticks)
     ax.set_xticks(yticks)
+    
+    ax.set_yticklabels(yticklabels)
+    ax.set_xticklabels(yticklabels)
     if plot_type == 'Se':
         ax.collections[0].colorbar.set_label("External Trehalose\n Log Conc. (Molar)")
         ax.set_title('External Domain \nTime = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
@@ -877,9 +888,9 @@ def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plo
 
     ax.set_ylabel('{}'.format(params['plot_units_space']))
     ax.set_xlabel('{}'.format(params['plot_units_space']))
-    ax.invert_yaxis()
+    ##ax.invert_yaxis()
     #ax.axis('equal')
-    ax.margins(0.1)
+    ax.margins(1.9)
     # ax.set(yticklabels=[])
     # ax.set(xticklabels=[])
     # ax.invert_xaxis()
@@ -890,8 +901,9 @@ def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plo
                                                                         curr_time,
                                                                         plot_type,
                                                                         run)
+    plt.tight_layout()
     fig = ax.get_figure()
-    fig.savefig(fig_name)
+    fig.savefig(fig_name, bbox_inches="tight")
     plt.close(fig)
 # ----------------------------------------------------------------------------
 

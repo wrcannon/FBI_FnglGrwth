@@ -412,6 +412,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
     seg_lengths = mycelia['seg_length'][:num_total_segs]
     seg_volume = seg_lengths*params['cross_area']
     gluc_curr_concentrations = gluc_curr/seg_volume
+    
     if(np.any(gluc_curr < 0)):
         print('Glucose below 0.0:',np.min(gluc_curr))
         breakpoint()
@@ -568,7 +569,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
 
         #d2treha_dx2[idx] =  np.sum(delta_treha_conc_nbrs/nbr_dist_sqr*volume_use_treha)
 
-    to_nbrs = np.array(to_nbrs)
+    to_nbrs = np.array(to_nbrs,dtype=object)
     # len_to_neighbors = Number of neighbors including self:
     len_to_nbrs = np.array([len(to_nbrs[i]) for i in range(len(to_nbrs))]).reshape(-1,1)
 
@@ -785,8 +786,10 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
         print('Net Convection of CW greater than zero')
         #for idx in range(num_total_segs):
         #    diffcw =  -cw_convect_term[idx]
-    if (np.abs(np.sum(gluc_convect_term[:num_total_segs]))/np.mean(np.abs(gluc_convect_term[:num_total_segs])) > 1.0e-15):
-        print('Glucose advection too high')
+    # Sum/net advection should be zero:
+    relative_net_advection = np.abs(np.sum(gluc_convect_term[:num_total_segs]))/np.mean(np.abs(gluc_convect_term[:num_total_segs]))
+    if (relative_net_advection > 1.0e-15):
+        print('Glucose advection too high: ', relative_net_advection)
 
     # Update concentrations due to convection
     if (np.any(mycelia['cw_i'][:num_total_segs] + params['dt']*cw_convect_term < 0)):

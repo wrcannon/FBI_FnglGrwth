@@ -78,7 +78,7 @@ def driver_singleNutrient(run):
     print('fungal_fusion : ', fungal_fusion)
     
     # Is chemoattractant released at the tip only? 1 = YES, 0 = NO
-    isTipRelease = 1
+    isTipRelease = 0
     print('isTipRelease : ', isTipRelease)
     
     # Is the initial condition a line or a cross? 1 = Line, 0 = Cross
@@ -144,7 +144,7 @@ def driver_singleNutrient(run):
     else:
         x_vals, y_vals, sub_e_gluc, sub_e_treha = sf.external_grid_patchy(setBackground)
     
-    thisfile = open('grid_coordinates.txt','w')
+    thisfile = open('grid_coordinates_temp.txt','w')
     for i in range(np.shape(x_vals)[0]): 
         print(x_vals[i],y_vals[i],file=thisfile)
     thisfile.close()
@@ -216,6 +216,15 @@ def driver_singleNutrient(run):
     #hf.plot_fungus(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
     #hf.plot_fungus_gluc(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
     #hf.plot_fungus_generic(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
+    restart = 1
+    if (restart == 1):
+            file = open('restart.pkl','rb')
+            mycelia = pickle.load(file)
+            num_total_segs = pickle.load(file)
+            sub_e_gluc = pickle.load(file)
+            sub_e_treha = pickle.load(file)
+            current_time = pickle.load(file)
+            file.close()
     
     print_increment = 1
     while current_time < params['final_time']: 
@@ -344,6 +353,15 @@ def driver_singleNutrient(run):
             if(current_time > 24*3600*10):
                 grd_density = sf.grid_density(mycelia, sub_e_gluc, num_total_segs) 
                 print('Max grid density = ', np.max(grd_density))
+            
+        if (current_time > 0.25* print_time):
+            file = open('restart.pkl','wb')
+            pickle.dump(mycelia,file)
+            pickle.dump(num_total_segs,file)
+            pickle.dump(sub_e_gluc,file)
+            pickle.dump(sub_e_treha,file)
+            pickle.dump(current_time,file)
+            file.close()
 
         # if current_step % (4*160) == 0: 
         # if current_step % (1*160) == 0:
