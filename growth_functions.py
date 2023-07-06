@@ -746,7 +746,7 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals,
     Driver function for branching - determines which segments branch, updates
     the structural information.
     """
-
+    reached_max_branches = False
     # Get the number density of segments around each segment 
     ndensity = [len(i) for i in mycelia['share_e'][:num_total_segs]]
     # Find those segments that have greater than half of their grid filled by other segments
@@ -765,7 +765,7 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals,
         #     breakpoint()
 
     if not np.any(potential_branch_idxs):
-        return mycelia, num_total_segs, dtt
+        return reached_max_branches, mycelia, num_total_segs, dtt
 
     if(use_original == 1):
         rand_vals = np.random.uniform(0, 1, (len(potential_branch_idxs),1))
@@ -822,6 +822,10 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals,
 
             # Locations of new branch tips
             new_tips = np.arange(len(true_branch_ids)) + num_total_segs
+            if np.max(new_tips) > np.shape(mycelia['cw_i'])[0]:
+                reached_max_branches = True;
+                return reached_max_branches, mycelia, num_total_segs, dtt
+            
             # print('new branch(es):', new_tips)
             if(np.shape(mycelia['cw_i'][new_tips]) != np.shape(cost_branch_cw)):
                 breakpoint()
@@ -890,7 +894,7 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals,
             if(np.any( mycelia['gluc_i'][:num_total_segs]< 0)):
                 breakpoint()
 
-    return mycelia, num_total_segs, dtt
+    return reached_max_branches, mycelia, num_total_segs, dtt
 
 
 # ----------------------------------------------------------------------------

@@ -228,6 +228,18 @@ def get_filepath(params):
 # PLOTTING FUNCTIONS
 # ----------------------------------------------------------------------------
 
+def output_hyphal_coordinates(segments, hyphal_coord_file):
+    thisfile = open(hyphal_coord_file, 'w')
+    for i in range(np.shape(segments)[0]): 
+        print(segments[i],file=thisfile)
+    thisfile.close()
+
+def output_extern_concs(sub_e, extern_conc_file):
+    thisfile = open(extern_conc_file, 'w')
+    for i in range(np.shape(sub_e)[0]): 
+        print(sub_e[i],file=thisfile)
+    thisfile.close()
+
 def plot_fungus(mycelia, num_total_segs, curr_time, folder_string, param_string, params, run):
     """
     Parameters
@@ -307,10 +319,19 @@ def plot_fungus(mycelia, num_total_segs, curr_time, folder_string, param_string,
     elif params['plot_units_time'] == 'seconds':
         plot_time = curr_time
 
-    coord_file = open('hyphal_coordinates'+str(plot_time)+'.txt', 'w')
-    for i in range(np.shape(segments)[0]): 
-        print(segments[i],file=coord_file)
-    coord_file.close()
+    hyphal_coord_file = "Results/{}/Run{}/{}_t={:0.2f}_hyphal_coordinates_run{}.txt".format(param_string,
+                                                                        run,
+                                                                        param_string,
+                                                                        curr_time,
+                                                                        run)
+    output_hyphal_coordinates(segments, hyphal_coord_file)
+#    print(hyphal_coord_file)
+#    thisfile = open(hyphal_coord_file, 'w')
+#    print(type(thisfile))
+#    coord_file = open(thisfile, 'w')
+#    for i in range(np.shape(segments)[0]): 
+#        print(segments[i],file=coord_file)
+#    coord_file.close()
     # Set labels, title, margins, etc.
     # ax.set_ylabel('dm')
     # ax.set_xlabel('dm')
@@ -862,10 +883,12 @@ def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plo
     elif params['plot_units_time'] == 'seconds':
         plot_time = curr_time
 
-    thisfile = open('external_concentrations'+str(plot_time)+'.txt', 'w')
-    for i in range(np.shape(sub_e)[0]): 
-        print(sub_e[i],file=thisfile)
-    thisfile.close()
+    extern_conc_file = "Results/{}/Run{}/{}_t={:0.2f}_external_concentrations_run{}.txt".format(param_string,
+                                                                        run,
+                                                                        param_string,
+                                                                        curr_time,
+                                                                        run)
+    output_extern_concs(sub_e, extern_conc_file)
     # breakpoint()
     # Plot
     if plot_type == 'Se':

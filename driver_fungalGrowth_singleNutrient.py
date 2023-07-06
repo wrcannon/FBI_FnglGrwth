@@ -44,6 +44,7 @@ full_rxn = 'Full Rxn'
 
 def driver_singleNutrient(run):
     t_0 = time.time()
+    reached_max_branches = False
     
     # ----------------------------------------------------------------------------
     # SET UP
@@ -218,7 +219,7 @@ def driver_singleNutrient(run):
     #hf.plot_fungus_generic(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
     restart = 0
     if (restart == 1):
-            file = open('restart0.pkl','rb')
+            file = open('restart.pkl','rb')
             mycelia = pickle.load(file)
             num_total_segs = pickle.load(file)
             dtt = pickle.load(file)
@@ -298,8 +299,6 @@ def driver_singleNutrient(run):
         
         old_num_total_segs = num_total_segs
         # breakpoint()
-        if (current_time > 11000):
-            xxxx = 1
         mycelia, num_total_segs, dtt = gf.extension(mycelia, num_total_segs, 
                                         dtt, x_vals, y_vals,isCalibration, 
                                         dist2Tip_new, fungal_fusion,
@@ -323,11 +322,15 @@ def driver_singleNutrient(run):
 
         old_num_total_segs = num_total_segs 
         if any(np.where(mycelia['can_branch'])[0]):
-            mycelia, num_total_segs, dtt = gf.branching(mycelia, 
+            reached_max_branches, mycelia, num_total_segs, dtt = gf.branching(mycelia, 
                                         num_total_segs, dtt, x_vals, y_vals, 
                                         isCalibration, dist2Tip_new, 
                                         fungal_fusion, restrictBranching,
                                         chance_to_fuse)
+        if reached_max_branches == True:
+            print ('Reached maximum number of branches:', np.max(mycelia['cw_i'])[0])
+            breakpoint()
+            break
         if (old_num_total_segs > num_total_segs):
            breakpoint()
         tB_1 = time.time()
@@ -783,6 +786,15 @@ def driver_singleNutrient(run):
 
     # end
     
+    # Write out a restart file
+    file = open('restart_final.pkl','wb')
+    pickle.dump(mycelia,file)
+    pickle.dump(num_total_segs,file)
+    pickle.dump(dtt,file)
+    pickle.dump(sub_e_gluc,file)
+    pickle.dump(sub_e_treha,file)
+    pickle.dump(current_time,file)
+    file.close()
     
     # Plot results at final time
     hf.plot_fungus(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
