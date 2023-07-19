@@ -55,7 +55,7 @@ def driver_singleNutrient(run):
     
     # Extract some commonly used parameters
     sl = params['sl']
-    dt = params['dt']
+    dt_i = params['dt_i']
     
     ###########################################################################
     ###########################################################################
@@ -73,7 +73,14 @@ def driver_singleNutrient(run):
     # Is the background environment diffusion-capable? 1 = YES, 0 = NO
     backDiff = 1
     print('backDiff : ', backDiff)
+
+    # Is the nutrient background variable or fixed?
+    # variable = 1; fixed = 0
+    var_nutrient_backgrnd = 0
+    if (var_nutrient_backgrnd == 0): # We still want excreted compounds to diffuse, though
+        glucDiff = 0
     
+
     # Is fungal fusion (anastomosis) active? 1 = YES, 0 = NO
     fungal_fusion = 0
     print('fungal_fusion : ', fungal_fusion)
@@ -230,6 +237,18 @@ def driver_singleNutrient(run):
     
     print_increment = 1
     while current_time < params['final_time']: 
+        # Convert units
+        if params['plot_units_time'] == 'days':
+            plot_time = current_time / (60*60*24)
+        elif params['plot_units_time'] == 'hours':
+            plot_time = current_time / (60*60)
+        elif params['plot_units_time'] == 'minutes':
+            plot_time = current_time / 60
+        elif params['plot_units_time'] == 'seconds':
+            plot_time = current_time
+        print('Time: ', plot_time, params['plot_units_time'])
+
+
         # if current_time > 0 and num_total_segs >= 20:
         #     print('Simulation terminated due to maximal segment number limit reached.')
         #     break
@@ -237,47 +256,55 @@ def driver_singleNutrient(run):
         if current_time == 0:
             print('branchingRate : ', params['branch_rate'])
         
+        #Loop over updates for external diffusion and uptake by fungi    
+        ntimes = np.floor(params['dt_i']/ params['dt_e'])
+        if (ntimes < 1):
+            print('Internal time step is less than external time step')
+            breakpoint()
+        this_time = 0
+        while(this_time < ntimes):
+            this_time = this_time + 1
+            if current_step % step_size_extern == 0:  
+                # EXTERNAL NUTRIENT
+                tE_0 = time.time()
+                # sub_e_gluc = nf.rk_update(sub_e_gluc, 'glucose', step_size_extern)
+                ##################################################################
+                ######################## Background Diffusion ####################
+                ##################################################################            
             
-        if current_step % step_size_extern == 0:  
-            # EXTERNAL NUTRIENT
-            tE_0 = time.time()
-            # sub_e_gluc = nf.rk_update(sub_e_gluc, 'glucose', step_size_extern)
-            ##################################################################
-            ######################## Background Diffusion ####################
-            ##################################################################            
-            
-            if backDiff == 1:
-                sub_e_gluc = nf.diffusion_ADI(sub_e_gluc)
-                sub_e_treha = nf.diffusion_ADI_treha(sub_e_treha)
-                # if np.min(sub_e_gluc)<1e-17:
-                #     breakpoint()
-                if np.min(sub_e_treha)<0:
-                    # if np.min(sub_e_treha)<-1e12:
-                        # breakpoint()
+                if backDiff == 1:
+                    if (glucDiff != 0):
+                        sub_e_gluc = nf.diffusion_ADI(sub_e_gluc)
+                    sub_e_treha = nf.diffusion_ADI_treha(sub_e_treha)
+                    # if np.min(sub_e_gluc)<1e-17:
+                    #     breakpoint()
+                    if np.min(sub_e_treha)<0:
+                        # if np.min(sub_e_treha)<-1e12:
+                            # breakpoint()
                         
-                    negativeTreha = np.where(sub_e_treha<0.0)[:]
-                    sub_e_treha[negativeTreha] = 0.0
+                        negativeTreha = np.where(sub_e_treha<0.0)[:]
+                        sub_e_treha[negativeTreha] = 0.0
             
-            ##################################################################
-            ######################## Background Diffusion ####################
-            ##################################################################
-            # breakpoint()
-            tE_1 = time.time()
-            time_external += (tE_1 - tE_0)
+                ##################################################################
+                ######################## Background Diffusion ####################
+                ##################################################################
+                # breakpoint()
+                tE_1 = time.time()
+                time_external += (tE_1 - tE_0)
         
-        # UPTAKE
-        tU_0 = time.time()
-        mycelia = nf.uptake(sub_e_gluc, mycelia, num_total_segs)
-        # breakpoint()
+            # UPTAKE
+            tU_0 = time.time()
+            mycelia = nf.uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd)
+            # mycelia = nf.uptake(sub_e_gluc, sub_e_treha, mycelia, num_total_segs, var_nutrient_backgrnd)
+            tU_1 = time.time()
+            time_uptake += (tU_1 - tU_0)
+        # end while
+        
+        # RELEASE
         mycelia = nf.release(sub_e_treha, mycelia, num_total_segs, isTipRelease)
-        # mycelia = nf.uptake(sub_e_gluc, sub_e_treha, mycelia, num_total_segs)
         if (np.isnan(np.sum(mycelia['cw_i'][:num_total_segs]))):
-                breakpoint()
-       
-        tU_1 = time.time()
-        time_uptake += (tU_1 - tU_0)
-        
-
+            breakpoint()
+               
         # TRANSLOCATION
         tT_0 = time.time()
         
@@ -317,8 +344,6 @@ def driver_singleNutrient(run):
         #    breakpoint()
 
         tB_0 = time.time()
-        if (current_time > 345600):
-            bob = 1
 
         old_num_total_segs = num_total_segs 
         if any(np.where(mycelia['can_branch'])[0]):
@@ -358,7 +383,7 @@ def driver_singleNutrient(run):
                 grd_density = sf.grid_density(mycelia, sub_e_gluc, num_total_segs) 
                 print('Max grid density = ', np.max(grd_density))
             
-        if (current_time > 0.25* print_time):
+        #if (current_time > 0.25* print_time):
             file = open('restart.pkl','wb')
             pickle.dump(mycelia,file)
             pickle.dump(num_total_segs,file)
@@ -713,7 +738,7 @@ def driver_singleNutrient(run):
             if np.any(mycelia['seg_length'][min_seg_length_nonTipIdx[min_seg_length_nonTipIdx2]]):
                 min_seg_length = min(mycelia['seg_length'][min_seg_length_nonTipIdx[min_seg_length_nonTipIdx2]])
             # breakpoint()
-            potential_CFL_fail_segment = np.where(mycelia['seg_length'][:num_total_segs] < params['dt']*params['kg1_wall'])[0]
+            potential_CFL_fail_segment = np.where(mycelia['seg_length'][:num_total_segs] < params['dt_i']*params['kg1_wall'])[0]
             CFL_fail_segment = len(np.where(mycelia['is_tip'][potential_CFL_fail_segment] == False)[0])
             #total_biomass = np.sum(mycelia['seg_length'])*params['cross_area']*params['hy_density']
     
@@ -775,12 +800,12 @@ def driver_singleNutrient(run):
             
             WWWW = np.where(avg_treha_annulus == np.max(avg_treha_annulus))[0]
             print('Max avg treha at contour : ', WWWW)
-            hf.plot_avg_treha_annulus(avg_treha_annulus,np.max(avg_treha_annulus), 'Avgerage Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
+            hf.plot_avg_treha_annulus(avg_treha_annulus,np.max(avg_treha_annulus), np.min(avg_treha_annulus), 'Avgerage Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
             hf.plot_max_treha_annulus(max_treha_annulus,1.0, 'Max Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
             hf.plot_min_treha_annulus(min_treha_annulus,1.0, 'Min Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
         # Update time
             # breakpoint()
-        current_time += dt
+        current_time += dt_i
         current_step += 1
         # end
 
@@ -983,7 +1008,7 @@ def driver_singleNutrient(run):
     max_seg_length = max(mycelia['seg_length'])[0]
     min_seg_length = min(mycelia['seg_length'][min_seg_length_nonTipIdx[min_seg_length_nonTipIdx2]])[0]
     # breakpoint()
-    potential_CFL_fail_segment = np.where(mycelia['seg_length'][:num_total_segs] < params['dt']*params['kg1_wall'])[0]
+    potential_CFL_fail_segment = np.where(mycelia['seg_length'][:num_total_segs] < params['dt_i']*params['kg1_wall'])[0]
     CFL_fail_segment = len(np.where(mycelia['is_tip'][potential_CFL_fail_segment] == False)[0])
     total_biomass = np.sum(mycelia['seg_length'])*params['cross_area']*params['hy_density']
     
@@ -1092,7 +1117,7 @@ def driver_singleNutrient(run):
     hf.plot_stat(count_times, count_tips, 'Num. of Tips', folder_string, param_string, params, run)
     hf.plot_stat(count_times, count_branches/count_tips, 'Branching Density', folder_string, param_string, params, run)
     hf.plot_stat(count_times, count_radii, 'Radii of Mycelia ({})'.format(params['plot_units_space']), folder_string, param_string, params, run)
-    hf.plot_avg_treha_annulus(avg_treha_annulus,np.max(avg_treha_annulus), 'Avgerage Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
+    hf.plot_avg_treha_annulus(avg_treha_annulus,np.max(avg_treha_annulus), np.min(avg_treha_annulus), 'Average Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
     # hf.plot_avg_treha_annulus(avg_treha_annulus,np.max(avg_treha_annulus), 'Avgerage Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
     hf.plot_max_treha_annulus(max_treha_annulus,1.0, 'Max Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
     hf.plot_min_treha_annulus(min_treha_annulus,1.0, 'Min Trehalose Per Annulus', folder_string, param_string, current_time, params, run)

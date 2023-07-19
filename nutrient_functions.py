@@ -48,7 +48,7 @@ def diffusion_ADI(sub_e):
     # Create tri-diagonal matrix
     num_rows = np.shape(sub_e)[0]
     num_cols = np.shape(sub_e)[1]
-    r_coeff = (params['dt']*params['diffusion_e_gluc'])/(2*params['dy']**2)
+    r_coeff = (params['dt_e']*params['diffusion_e_gluc'])/(2*params['dy']**2)
     banded_mat_rows = np.tile(np.array([-r_coeff, (1+2*r_coeff), -r_coeff]).reshape(3,1),num_cols)
     banded_mat_cols = np.tile(np.array([-r_coeff, (1+2*r_coeff), -r_coeff]).reshape(3,1),num_rows)
     
@@ -139,7 +139,7 @@ def diffusion_ADI_treha(sub_e):
     # breakpoint()
     num_rows = np.shape(sub_e)[0]
     num_cols = np.shape(sub_e)[1]
-    r_coeff = (params['dt']*params['diffusion_e_gluc'])/(2*params['dy']**2)
+    r_coeff = (params['dt_e']*params['diffusion_e_gluc'])/(2*params['dy']**2)
     banded_mat_rows = np.tile(np.array([-r_coeff, (1+2*r_coeff), -r_coeff]).reshape(3,1),num_cols)
     banded_mat_cols = np.tile(np.array([-r_coeff, (1+2*r_coeff), -r_coeff]).reshape(3,1),num_rows)
     
@@ -562,8 +562,8 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
 
     # Update due to diffusion:
     mycelia_before = mycelia['gluc_i'][:num_total_segs].copy()
-    mycelia['gluc_i'][:num_total_segs] += params['dt']*gluc_diff_term
-    mycelia['treha_i'][:num_total_segs] += params['dt']*treha_diff_term
+    mycelia['gluc_i'][:num_total_segs] += params['dt_i']*gluc_diff_term
+    mycelia['treha_i'][:num_total_segs] += params['dt_i']*treha_diff_term
     negative_gluc_i_idx = np.where(mycelia['gluc_i'][:num_total_segs] < 0)[0]
     if len(negative_gluc_i_idx)>0:
         print('Glucose before diffusion_term :',mycelia_before[negative_gluc_i_idx])
@@ -604,19 +604,19 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
     if (np.isnan(np.sum(convert_term))):
             breakpoint()
     #convert_term[np.where(mycelia['is_tip'])] = 0 #Why do this? Why can't the tip have metabolism?
-    if (np.any(mycelia['gluc_i'][:num_total_segs] - params['dt']*convert_term < 0)):
-        bad_idx = np.where((mycelia['gluc_i'][:num_total_segs] - params['dt']*convert_term) < 0)
+    if (np.any(mycelia['gluc_i'][:num_total_segs] - params['dt_i']*convert_term < 0)):
+        bad_idx = np.where((mycelia['gluc_i'][:num_total_segs] - params['dt_i']*convert_term) < 0)
         print(bad_idx)
         print('Glucose before conversion:',mycelia['gluc_i'][bad_idx])
-        print('Amount converted:',convert_term[bad_idx]*params['dt'])
+        print('Amount converted:',convert_term[bad_idx]*params['dt_i'])
         print('Convert rate:',convert_term[bad_idx])
         breakpoint()
     mycelia_before = mycelia['gluc_i'][:num_total_segs].copy()
     # Here glucose is converted to other metabolites:
-    mycelia['gluc_i'][:num_total_segs] -= params['dt']*convert_term
-    mycelia['cw_i'][:num_total_segs] += params['dt']*(params['yield_c_in_mmoles']*convert_term)
+    mycelia['gluc_i'][:num_total_segs] -= params['dt_i']*convert_term
+    mycelia['cw_i'][:num_total_segs] += params['dt_i']*(params['yield_c_in_mmoles']*convert_term)
     #mycelia['treha_i'][:num_total_segs] += params['dt']*(convert_term*0.3*0.1)
-    mycelia['treha_i'][:num_total_segs] += params['dt']*(convert_term*0.1)
+    mycelia['treha_i'][:num_total_segs] += params['dt_i']*(convert_term*0.1)
 
     negative_cw_i_idx = np.where(mycelia['cw_i'][:num_total_segs] < 0)[0]
     negative_treha_i_idx = np.where(mycelia['treha_i'][:num_total_segs] < 0)[0]
@@ -670,7 +670,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
     advection_vel_cw = params['advection_vel_cw']
     advection_vel_gluc = advection_vel_cw*params['yield_c']
     
-    K_cw = advection_vel_cw*params['dt']
+    K_cw = advection_vel_cw*params['dt_i']
     alpha_cw = gf.michaelis_menten(1, K_cw, 
                                 mycelia['cw_i'][:num_total_segs])
 
@@ -752,16 +752,16 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
         print('Net Convection of CW greater than zero')
 
     # Update concentrations due to convection
-    if (np.any(mycelia['cw_i'][:num_total_segs] + params['dt']*cw_convect_term < 0)):
-        bad_idx = np.where((mycelia['cw_i'][:num_total_segs] + params['dt']*cw_convect_term[:num_total_segs]) < 0)
+    if (np.any(mycelia['cw_i'][:num_total_segs] + params['dt_i']*cw_convect_term < 0)):
+        bad_idx = np.where((mycelia['cw_i'][:num_total_segs] + params['dt_i']*cw_convect_term[:num_total_segs]) < 0)
         print('Bad indices: ',bad_idx)
         print('Cell Wall before conversion:',mycelia['cw_i'][bad_idx])
-        print('Amount converted:',cw_convect_term[bad_idx]*params['dt'])
+        print('Amount converted:',cw_convect_term[bad_idx]*params['dt_i'])
         print('Convert rate:',cw_convect_term[bad_idx])
-        print('Cell Wall after conversion:',mycelia['cw_i'][bad_idx] + params['dt']*(cw_convect_term[bad_idx]))
+        print('Cell Wall after conversion:',mycelia['cw_i'][bad_idx] + params['dt_i']*(cw_convect_term[bad_idx]))
         #breakpoint()
     
-    mycelia['cw_i'][:num_total_segs] += params['dt']*(cw_convect_term)
+    mycelia['cw_i'][:num_total_segs] += params['dt_i']*(cw_convect_term)
     
     negative_cw_i_idx = np.where(mycelia['cw_i'][:num_total_segs] < 0)[0]
     if len(negative_cw_i_idx)>0:
@@ -834,7 +834,7 @@ def uptake(sub_e_gluc, mycelia, num_total_segs):
     
     #if any(relative_seg_vol == 0):
     #    breakpoint()
-    gluc_uptake = params['dt']*gf.michaelis_menten(params['ku1_gluc'], 
+    gluc_uptake = params['dt_e']*gf.michaelis_menten(params['ku1_gluc'], 
                                                   params['Ku2_gluc']/relative_seg_vol, 
                                                   gluc_e)
     #gluc_uptake[np.where(relative_seg_vol <1e-15)] = 0

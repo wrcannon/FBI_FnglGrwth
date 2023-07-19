@@ -54,9 +54,12 @@ def get_configs(config_filename):
     init_vol_seg = sl*cross_area
 
     dy = discrete_params.getfloat('grid_len')
+    # Best to have dy = 0.5*sl:
+    #dy = 0.5*sl
     dz = discrete_params.getfloat('grid_height')
     vol_grid = dy*dy*dz
     diff_e_gluc = nutrient_params.getfloat('diffusion_e_gluc')
+    convert_for_export = nutrient_params.getfloat('convert_for_export')
     diff_i_gluc = nutrient_params.getfloat('diffusion_i_gluc')
     kg1_wall = nutrient_params.getfloat('kg1_wall')
     hy_density =  growth_params.getfloat('hy_density')
@@ -73,8 +76,11 @@ def get_configs(config_filename):
                                                     # scaling it by the volume of the hyphae gives the rate that glucose
                                                     # would spread in 2-dimensions per second.
 
-    dt = 0.0025*min((sl**2/diff_i_gluc),(sl/kg1_wall)) #kg1_wall should be advection rate
-    dt = 0.01*min((sl**2/diff_i_gluc),1/(advection_vel_cw*0.02))
+    #dt = 0.0025*min((sl**2/diff_i_gluc),(sl/kg1_wall)) #kg1_wall should be advection rate
+    dt_i = 0.01*min((sl**2/diff_i_gluc),1/(advection_vel_cw*0.02))
+    dt_e = 0.01*(dy**2/diff_e_gluc)
+    #dt = min(dt, dy**2/(diff_e_gluc))
+    #dt = 0.01*dt
 
     #dt = 22.5
     #dt = 0.5*0.75*min((sl**2/diff_i_gluc),(sl/linear_growth_rate))
@@ -91,12 +97,13 @@ def get_configs(config_filename):
     # Save to a dictionary
     params_dict = {
         # SECTION 1: Discretization Parameters
-        'dt' : dt,
+        'dt_i' : dt_i,
+        'dt_e' : dt_e,
         'final_time' : discrete_params.getfloat('final_time'),
         'plot_units_time' : discrete_params['plot_units_time'],
 
         'sl' : sl,
-        'dy' :  0.5*sl,
+        'dy' : dy,
         'vol_grid': vol_grid,
         'plot_units_space' : discrete_params['plot_units_space'],
         'init_segs_count' : discrete_params.getint('init_segs_count'),
@@ -123,6 +130,7 @@ def get_configs(config_filename):
         'init_sub_e_gluc' : nutrient_params.getfloat('init_sub_e_gluc')*vol_grid,
         'init_sub_e_treha' : nutrient_params.getfloat('init_sub_e_treha')*vol_grid,
         'diffusion_e_gluc' : diff_e_gluc,
+        'convert_for_export': convert_for_export,
 
         'init_sub_i_gluc' : nutrient_params.getfloat('init_sub_i_gluc'),
         'diffusion_i_gluc' : nutrient_params.getfloat('diffusion_i_gluc'),
@@ -219,7 +227,8 @@ def get_filepath(params):
     # file_string = "oldD2Tip_Fus_tipRe_brRate1e9_resBr4_noBkDiffLowGluc2_bkPatchy_Trsloc_4init"
     # file_string = "recalibration_02242022"
     #file_string = "NoFusion_tipRel_patch3Env_initGluc2um_branch0_3_brCost1x_t1"
-    file_string = "NoFusion_AllHyphRel_homogenousEnv_initGluc20mm_branch0_3_brCost1x_t1_v2"
+    file_string = "NoFusion_AllHyphRelease_homogenousEnv_initGluc20mm_branch0_3_brCost1x_200x200x0.20umGrid"
+    #file_string = "test"
     #file_string = "noFusion_tipRel_homogenousEnv"
     return folder_string, file_string
 
@@ -859,7 +868,7 @@ def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plo
 
     """
     # Convert to molar quantities for display
-    sub_e = np.log(sub_e/params['vol_grid']*1e12) 
+    sub_e = np.log10(sub_e/params['vol_grid']*1e12) 
     sub_e[np.where(np.isinf(sub_e))] = np.min(sub_e[np.where(np.isfinite(sub_e))])-1
     
 
@@ -970,7 +979,7 @@ def plot_stat(count_times, count_stat, stat_type, folder_string, param_string, p
 
 # ----------------------------------------------------------------------------
 
-def plot_avg_treha_annulus(count_stat,max_count_stat, stat_type, folder_string, param_string, current_time, params, run):
+def plot_avg_treha_annulus(count_stat,max_count_stat,min_count_stat, stat_type, folder_string, param_string, curr_time, params, run):
 
     fig, ax = plt.subplots()
     xlabel = range(30,30*len(count_stat),30)
@@ -981,6 +990,22 @@ def plot_avg_treha_annulus(count_stat,max_count_stat, stat_type, folder_string, 
     ax.set_ylabel(stat_type)
     sns.despine()
     #plt.show()
+
+    # Convert units
+    if params['plot_units_time'] == 'days':
+        plot_time = curr_time / (60*60*24)
+    elif params['plot_units_time'] == 'hours':
+        plot_time = curr_time / (60*60)
+    elif params['plot_units_time'] == 'minutes':
+        plot_time = curr_time / 60
+    elif params['plot_units_time'] == 'seconds':
+        plot_time = curr_time
+
+
+    max_conc = (max_count_stat/params['vol_grid']*1e12)
+    min_conc = (min_count_stat/params['vol_grid']*1e12) 
+    ax.set_title('Max conc = {:0.2e} Min conc = {:0.2e}'.format(max_conc, min_conc),fontweight="bold")
+    plt.suptitle('Time = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
 
     if stat_type == 'Num. of Branches':
         key_word = 'stat_b'
@@ -995,7 +1020,7 @@ def plot_avg_treha_annulus(count_stat,max_count_stat, stat_type, folder_string, 
     fig_name = "Results/{}/Run{}/{}_{}_{}_avgTrehaAnnulus.png".format(param_string,
                                                       run,
                                                       param_string,
-                                                      current_time,
+                                                      curr_time,
                                                       run)
     fig.savefig(fig_name)
     plt.close()

@@ -192,7 +192,10 @@ def cost_of_growth(mycelia, idxs, grow_len):
         # grow_len = new_grow_len #if we change grow_len do we need to change dt also?
         
         not_enough_cw = np.where(mycelia['cw_i'][idxs] < cost_grow_cw)[0]
-        grow_len[[not_enough_cw]] = grow_len[not_enough_cw]*mycelia['cw_i'][idxs[not_enough_cw]]/cost_grow_cw[not_enough_cw] #0.0
+        try:
+            grow_len[[not_enough_cw]] = grow_len[not_enough_cw]*mycelia['cw_i'][idxs[not_enough_cw]]/cost_grow_cw[not_enough_cw] #0.0
+        except:
+            breakpoint()
         # cost_grow_cw[not_enough_cw] = 0.0
         
          # The alternative is to set the grow_len to zero and wait until enough material
@@ -656,7 +659,7 @@ def extension(mycelia, num_total_segs, dtt, x_vals, y_vals,
 
     use_original = 0
     if(use_original == 1):
-        extend_len = params['dt']*michaelis_menten(params['kg1_wall'],
+        extend_len = params['dt_i']*michaelis_menten(params['kg1_wall'],
                                                    params['Kg2_wall'],
                                                    params['yield_g']*params['mw_cw']*mycelia['cw_i'][tip_idxs])
     else:   
@@ -665,12 +668,12 @@ def extension(mycelia, num_total_segs, dtt, x_vals, y_vals,
                         params['Kg2_wall'],
                         mycelia['cw_i'][tip_idxs])
         #extend_len = params['dt']*dLdt
-        extend_len = params['dt']*params['kg1_wall']*np.ones(np.shape([tip_idxs])).T
+        extend_len = params['dt_i']*params['kg1_wall']*np.ones(np.shape([tip_idxs])).T
     
     if any(extend_len > 1e2):
         breakpoint()
     # Cost to grow predetermined amount or shorten if cost is too much
-    extend_len, cost_grow_gluc, cost_grow_cw = cost_of_growth(mycelia, tip_idxs, extend_len)
+    extend_len, cost_grow_gluc, cost_grow_cw = cost_of_growth(mycelia, np.array(tip_idxs), extend_len)
     if(np.shape(mycelia['cw_i'][tip_idxs]) != np.shape(cost_grow_cw)):
         breakpoint()
     if any(extend_len > 1e2):
@@ -775,7 +778,7 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals,
         
     else:
         advection_vel_cw = params['advection_vel_cw']
-        K_cw = advection_vel_cw*params['dt']
+        K_cw = advection_vel_cw*params['dt_i']
         alpha_cw = michaelis_menten(1, K_cw, 
                                 mycelia['cw_i'][:num_total_segs])
         nutrient_scaling = 1.0 #rich media
@@ -784,12 +787,12 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals,
         #true_idx = np.where((prob - rand_vals).flatten() > 0)
         
         #print('potential_branch_idxs = ', potential_branch_idxs)
-        branch_len = params['dt']*michaelis_menten(params['kg1_wall'],
+        branch_len = params['dt_i']*michaelis_menten(params['kg1_wall'],
                                                        params['Kg2_wall'],
                                                        mycelia['cw_i'][potential_branch_idxs])
-        len0 = params['kg1_wall']*params['dt']
+        len0 = params['kg1_wall']*params['dt_i']
         branch_len0 = np.ones((len(potential_branch_idxs),1))*len0
-        branch_len, cost_branch_gluc, cost_branch_cw = cost_of_growth(mycelia, potential_branch_idxs, branch_len0)
+        branch_len, cost_branch_gluc, cost_branch_cw = cost_of_growth(mycelia, np.array(potential_branch_idxs), branch_len0)
         cost_multiple = 4.0#0.5
         # prob = 1.0 - np.exp(-(mycelia['cw_i'][potential_branch_idxs] - cost_multiple*cost_branch_cw)/(cost_multiple*cost_branch_cw))
         #prob = np.exp((branch_len-1*branch_len0)/branch_len0)
@@ -811,11 +814,11 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals,
         
     if any(true_branch_ids):
         if(use_original ==1):
-            branch_len = params['dt']*michaelis_menten(params['kg1_wall'],
+            branch_len = params['dt_i']*michaelis_menten(params['kg1_wall'],
                                                    params['Kg2_wall'],
                                                    params['yield_g']*params['mw_cw']*mycelia['cw_i'][true_branch_ids])
 
-            branch_len, cost_branch_gluc, cost_branch_cw = cost_of_growth(mycelia, true_branch_ids, branch_len)
+            branch_len, cost_branch_gluc, cost_branch_cw = cost_of_growth(mycelia, np.array(true_branch_ids), branch_len)
         
         # If nutrient to extend, update tip
         if max(branch_len) > 0:
@@ -1145,7 +1148,7 @@ def anastomosis(mycelia, idx, num_total_segs, chance_to_fuse):
 
     # Define the zone to look for interactions in
     # minx, maxx, miny, maxy = get_box(xy1_c, xy2_c, params['sl'])
-    minx, maxx, miny, maxy = get_box(xy1_c, xy2_c, params['kg1_wall']*params['dt'])
+    minx, maxx, miny, maxy = get_box(xy1_c, xy2_c, params['kg1_wall']*params['dt_i'])
 
     # Initialize fusion flags
     seg_fuse = -1
@@ -1243,7 +1246,7 @@ def anastomosis(mycelia, idx, num_total_segs, chance_to_fuse):
 
                     print('Fusing in anastomosis')
                     # If the segment is long enough (satisfies CFL), proceed normally
-                    if new_seg_len >= params['dt']*params['kg1_wall']:
+                    if new_seg_len >= params['dt_i']*params['kg1_wall']:
                         mycelia['seg_length'][idx] = new_seg_len
                         mycelia['is_tip'][idx] = False
                         mycelia['can_branch'][idx] = True
@@ -1256,7 +1259,7 @@ def anastomosis(mycelia, idx, num_total_segs, chance_to_fuse):
     
                         # Define zone to look for interections in
                         # minx, maxx, miny, maxy = get_box(xy1_c, xy2_c, params['sl'])
-                        minx, maxx, miny, maxy = get_box(xy1_c, xy2_c, params['kg1_wall']*params['dt'])
+                        minx, maxx, miny, maxy = get_box(xy1_c, xy2_c, params['kg1_wall']*params['dt_i'])
     
                         # Update fusion neighbor marker
                         seg_fuse = target_idx
