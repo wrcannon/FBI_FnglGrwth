@@ -1,4 +1,3 @@
-Newest files are no longer located in the /WithTrehalose subfolder but are instead directly under /Bill1 branch (2/16/2022)
 
 # Fungal Structure Code
 
