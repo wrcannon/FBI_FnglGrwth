@@ -344,7 +344,7 @@ def external_grid():
 
 ##############################################################################
 
-def external_grid_patchy(set):
+def external_grid_patchy(set,seed=6):
     # Define external domain grid
     scale_val = params['grid_scale_val']
     # Number of grid x points = 2*params['sl']*scale_val/params['dy'] + 1:
@@ -371,6 +371,16 @@ def external_grid_patchy(set):
     # The width of a patch is M*params['dy']
     
     ## For grid_scale_val = 80
+    if (set == 0):
+        ## Set 0
+        M = 9
+        #r1 = [round(len(x_vals)/2)]
+        rng = np.random.default_rng(seed)
+        r1 =  [round(len(x_vals)/2)] + rng.integers(0, high=226, size=(49,), endpoint=False).tolist()
+        #r1.append(np.random.randint(low=1, high=240,size=(50,)).tolist())
+        #np.round(np.random.uniform(low=1, high=240,(50,))
+        r2 =  [round(len(y_vals)/2)] + rng.integers(0, high=240, size=(49,), endpoint=False).tolist()
+            
     if (set == 1):
         ## Set 1
         M = 9 # width of each focus of nutrient spots
@@ -383,7 +393,7 @@ def external_grid_patchy(set):
        182,    96,    64,    99,    32,
         40,   217,   220,   137,    24,
         62,    88,   191,    14,    20,
-        48,   153,   171,   153,   110,]
+        48,   153,   171,   153,   110]
         
         r2 = [round(len(y_vals)/2),    76,   174,    52,   161,
         51,    92,   148,   182,    29,

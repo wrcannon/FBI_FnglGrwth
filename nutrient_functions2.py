@@ -20,7 +20,7 @@ params, config = hf.get_configs('parameters.ini')
 # ----------------------------------------------------------------------------
 
 
-def diffusion_ADI(sub_e):
+def diffusion_ADI(sub_e, time_step):
     
     """
     Parameters
@@ -48,7 +48,7 @@ def diffusion_ADI(sub_e):
     # Create tri-diagonal matrix
     num_rows = np.shape(sub_e)[0]
     num_cols = np.shape(sub_e)[1]
-    r_coeff = (params['dt_e']*params['diffusion_e_gluc'])/(2*params['dy']**2)
+    r_coeff = (time_step*params['diffusion_e_gluc'])/(2*params['dy']**2)
     banded_mat_rows = np.tile(np.array([-r_coeff, (1+2*r_coeff), -r_coeff]).reshape(3,1),num_cols)
     banded_mat_cols = np.tile(np.array([-r_coeff, (1+2*r_coeff), -r_coeff]).reshape(3,1),num_rows)
     
@@ -110,18 +110,18 @@ def diffusion_ADI(sub_e):
     #     breakpoint()
     return sub_e_step2
 
-def diffusion_ADI_treha(sub_e):
+def diffusion_ADI_treha(sub_e, time_step):
     
     """
     Parameters
     ----------
     sub_e : array (2D)
-        The 2D grid storing values of glucose in the external domain.
+        The 2D grid storing values of exported metabolite in the external domain.
         
     Returns
     -------
     sub_e_step2 : array (2D)
-        The updated 2D grid storing values of glucose in the external domain
+        The updated 2D grid storing values of exported metabolite in the external domain
         after diffusion using the finite difference alternating-direction method
         which is implicit.
         
@@ -139,7 +139,7 @@ def diffusion_ADI_treha(sub_e):
     # breakpoint()
     num_rows = np.shape(sub_e)[0]
     num_cols = np.shape(sub_e)[1]
-    r_coeff = (params['dt_e']*params['diffusion_e_gluc'])/(2*params['dy']**2)
+    r_coeff = (time_step*params['diffusion_e_gluc'])/(2*params['dy']**2)
     banded_mat_rows = np.tile(np.array([-r_coeff, (1+2*r_coeff), -r_coeff]).reshape(3,1),num_cols)
     banded_mat_cols = np.tile(np.array([-r_coeff, (1+2*r_coeff), -r_coeff]).reshape(3,1),num_rows)
     
@@ -151,8 +151,8 @@ def diffusion_ADI_treha(sub_e):
     
     # Step 1: k+1/2 values - Loop through the rows
     sub_e_step1 = np.zeros((num_rows,num_cols))
-    # for row in range(num_rows):
-    for row in range(1,num_rows-1):
+    # for row in range(1,num_rows-1):
+    for row in range(num_rows):
         # Create the right hand side
         if row == 0:
             rhs_step1 = (r_coeff*params['init_sub_e_treha']
@@ -176,8 +176,8 @@ def diffusion_ADI_treha(sub_e):
     # breakpoint()
     # Step 2: k+1 values - Loop through the columns
     sub_e_step2 = np.zeros((num_rows,num_cols))
-    # for col in range(num_cols):
-    for col in range(1,num_cols-1):
+    # for col in range(1,num_cols-1):
+    for col in range(num_cols):
         # Create the right hand side
         if col == 0:
             rhs_step2 = (r_coeff*params['init_sub_e_treha']
@@ -526,7 +526,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
         # If the concentration of the neighbors is higher than teh concentration of idx, then the net flow
         # is out of idx to neighbors
         # diffuse2nbrs is True/False flag for which neigbors to diffuse to
-        diffuse2nbrs = [(delta_gluc_conc_nbrs < 0)]
+        diffuse2nbrs = tuple([(delta_gluc_conc_nbrs < 0)])
         frxn_delta_gluc_conc2nbrs = np.zeros((len(nbr_curr[idx]),1))
         total_delta_gluc_conc_nbrs = np.sum(delta_gluc_conc_nbrs[diffuse2nbrs])
         # Determine the frxn of glucose in idx that will go to neighbors
@@ -756,7 +756,10 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
             exprt = (cw_conc_diff < 0)
             imprt = (cw_conc_diff >= 0)
             volume_use_cw[(cw_conc_diff < 0)] = seg_volume[idx] # If conc_diff < 0, outflow from idx
-            volume_use_cw[(cw_conc_diff >= 0)] = from_nbr_volume[(cw_conc_diff > 0)] # If conc_diff > 0, inflow from idx
+            try:
+                volume_use_cw[(cw_conc_diff >= 0)] = from_nbr_volume[(cw_conc_diff >= 0)] # If conc_diff > 0, inflow from idx
+            except:
+                breakpoint()
             # Change to counts taking from teh correct segment volume
             cw_delta_count[idx] = np.sum(cw_from_scaled_nbrs*from_nbr_volume) - cw_curr_mod[idx]*seg_volume[idx]
             exprt_amt = (len(to_nbrs[idx]) > 0) * 1.0
@@ -846,7 +849,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
 # UPTAKE FUNCTIONS
 # ----------------------------------------------------------------------------
     
-def uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd):
+def uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd, time_step):
     """
     Parameters
     ----------
@@ -894,11 +897,16 @@ def uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd):
     # But this is probably the case
     relative_seg_vol = mycelia['seg_vol'][:num_total_segs].flatten()/params['init_vol_seg']
     
-    #if any(relative_seg_vol == 0):
-    #    breakpoint()
-    gluc_uptake = params['dt_e']*gf.michaelis_menten(params['ku1_gluc'], 
-                                                  params['Ku2_gluc']/relative_seg_vol, 
-                                                  gluc_e)
+    gluc_uptake = np.zeros(np.shape(relative_seg_vol))
+    uptake_idx = np.where(relative_seg_vol > 0)
+    no_uptake_idx = np.where(relative_seg_vol <= 0)
+    gluc_uptake[uptake_idx] = time_step*gf.michaelis_menten(params['ku1_gluc'], 
+                                                  params['Ku2_gluc']/relative_seg_vol[uptake_idx], 
+                                                  gluc_e[uptake_idx])
+    try:
+        gluc_uptake[no_uptake_idx] = 0.0
+    except:
+        breakpoint()
     #gluc_uptake[np.where(relative_seg_vol <1e-15)] = 0
     seg_lengths = mycelia['seg_length'][:num_total_segs]
     gluc_uptake[np.where(seg_lengths*seg_lengths < 0.1*params['diffusion_i_gluc'])[0]] = 0.0

@@ -76,13 +76,14 @@ def driver_singleNutrient(run):
 
     # Is the nutrient background variable or fixed?
     # variable = 1; fixed = 0
-    var_nutrient_backgrnd = 0
-    if (var_nutrient_backgrnd == 0): # We still want excreted compounds to diffuse, though
-        glucDiff = 0
+    var_nutrient_backgrnd = 1
+    # We may/may not still want excreted compounds to diffuse, though
+    glucDiff = 0
+    trehaDiff = 1
     
 
     # Is fungal fusion (anastomosis) active? 1 = YES, 0 = NO
-    fungal_fusion = 0
+    fungal_fusion = 1
     print('fungal_fusion : ', fungal_fusion)
     
     # Is chemoattractant released at the tip only? 1 = YES, 0 = NO
@@ -118,7 +119,7 @@ def driver_singleNutrient(run):
         ## the set to use.
         ## setBackground = 1,2,3 have 50 nutrient foci
         ## setBackground = 4,5 have 100 nutrient foci
-        setBackground = 3
+        setBackground = 0
     
     # Is the cell wall convection (active transport) scaled by local metabolism 
     # activity? 1 = YES, 0 = NO
@@ -150,7 +151,7 @@ def driver_singleNutrient(run):
     if (isPatchyExtEnvironment == 0):
         x_vals, y_vals, sub_e_gluc, sub_e_treha = sf.external_grid()
     else:
-        x_vals, y_vals, sub_e_gluc, sub_e_treha = sf.external_grid_patchy(setBackground)
+        x_vals, y_vals, sub_e_gluc, sub_e_treha = sf.external_grid_patchy(setBackground, run+1)
     
     thisfile = open('grid_coordinates_temp.txt','w')
     for i in range(np.shape(x_vals)[0]): 
@@ -159,7 +160,7 @@ def driver_singleNutrient(run):
     
     # Plotting label scaling parameters for external domain
     num_ticks = 11 # number of tick labels to appear
-    yticks = np.linspace(0, len(x_vals)-1, num_ticks, dtype=np.int)
+    yticks = np.linspace(0, len(x_vals)-1, num_ticks, dtype=np.int64)
     yticklabels = np.around(np.linspace(-sl*params['grid_scale_val'], sl*params['grid_scale_val'], num_ticks),3) 
 
     # File path for saving results
@@ -226,7 +227,8 @@ def driver_singleNutrient(run):
     #hf.plot_fungus_generic(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
     restart = 0
     if (restart == 1):
-            file = open('restart.pkl','rb')
+            restart_file = "restart.pkl"
+            file = open(restart_file,'rb')
             mycelia = pickle.load(file)
             num_total_segs = pickle.load(file)
             dtt = pickle.load(file)
@@ -234,6 +236,7 @@ def driver_singleNutrient(run):
             sub_e_treha = pickle.load(file)
             current_time = pickle.load(file)
             file.close()
+            N = round(len(x_vals)/2)-2
     
     print_increment = 1
     while current_time < params['final_time']: 
@@ -259,8 +262,12 @@ def driver_singleNutrient(run):
         #Loop over updates for external diffusion and uptake by fungi    
         ntimes = np.floor(params['dt_i']/ params['dt_e'])
         if (ntimes < 1):
-            print('Internal time step is less than external time step')
+            print('Internal time step is less than external time step:')
+            print('Assumption in simulation is that internal time step is greater than external time step.')
             breakpoint()
+        if ((glucDiff ==0) and (trehaDiff == 0)):
+            ntimes = 1
+            params['dt_e'] = params['dt_i']
         this_time = 0
         while(this_time < ntimes):
             this_time = this_time + 1
@@ -272,16 +279,15 @@ def driver_singleNutrient(run):
                 ######################## Background Diffusion ####################
                 ##################################################################            
             
-                if backDiff == 1:
-                    if (glucDiff != 0):
-                        sub_e_gluc = nf.diffusion_ADI(sub_e_gluc)
-                    sub_e_treha = nf.diffusion_ADI_treha(sub_e_treha)
+                if (glucDiff != 0):
+                    sub_e_gluc = nf.diffusion_ADI(sub_e_gluc, params['dt_e'])
+                if (trehaDiff != 0):
+                    sub_e_treha = nf.diffusion_ADI_treha(sub_e_treha, params['dt_e'])
                     # if np.min(sub_e_gluc)<1e-17:
                     #     breakpoint()
                     if np.min(sub_e_treha)<0:
                         # if np.min(sub_e_treha)<-1e12:
-                            # breakpoint()
-                        
+                            # breakpoint()    
                         negativeTreha = np.where(sub_e_treha<0.0)[:]
                         sub_e_treha[negativeTreha] = 0.0
             
@@ -294,7 +300,7 @@ def driver_singleNutrient(run):
         
             # UPTAKE
             tU_0 = time.time()
-            mycelia = nf.uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd)
+            mycelia = nf.uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd, params['dt_e'])
             # mycelia = nf.uptake(sub_e_gluc, sub_e_treha, mycelia, num_total_segs, var_nutrient_backgrnd)
             tU_1 = time.time()
             time_uptake += (tU_1 - tU_0)
@@ -384,7 +390,8 @@ def driver_singleNutrient(run):
                 print('Max grid density = ', np.max(grd_density))
             
         #if (current_time > 0.25* print_time):
-            file = open('restart.pkl','wb')
+            file_name = "Results/{}/Run{}/restart.pkl".format(param_string, run)
+            file = open(file_name,'wb')
             pickle.dump(mycelia,file)
             pickle.dump(num_total_segs,file)
             pickle.dump(dtt,file)
@@ -406,10 +413,12 @@ def driver_singleNutrient(run):
                 max_e_gluc = np.max(glucose_ext)
                 print('max_e_gluc : ', max_e_gluc)
                 hf.plot_externalsub(sub_e_gluc, yticks, yticklabels, current_time, max_e_gluc, 'Se', folder_string, param_string, params, run)
+                hf.plot_externalsub_hyphae(sub_e_gluc, mycelia, num_total_segs, yticks, yticklabels, current_time, params['init_sub_e_gluc'], 'Se', folder_string, param_string, params, run)
                 treha_ext = sub_e_treha/params['vol_grid']*1e12 # Convert to molar quantities for display
                 max_e_treha = np.max(treha_ext)
                 # max_e_treha_fixed = 1e-11
                 hf.plot_externalsub_treha(sub_e_treha, yticks, yticklabels, current_time, max_e_treha, 'Se', folder_string, param_string, params, run)
+                hf.plot_externalsub_treha_hyphae(sub_e_treha, mycelia, num_total_segs, yticks, yticklabels, current_time, max_e_treha, 'Se', folder_string, param_string, params, run)
             
             # dist_from_center = []
             # for i in range(num_total_segs):
@@ -812,7 +821,8 @@ def driver_singleNutrient(run):
     # end
     
     # Write out a restart file
-    file = open('restart_final.pkl','wb')
+    file_name = "Results/{}/Run{}/restart_final.pkl".format(param_string, run)
+    file = open(file_name,'wb')
     pickle.dump(mycelia,file)
     pickle.dump(num_total_segs,file)
     pickle.dump(dtt,file)
@@ -827,8 +837,12 @@ def driver_singleNutrient(run):
     hf.plot_fungus_treha(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
     if params['init_sub_e_gluc'] > 1e-15:
         hf.plot_externalsub(sub_e_gluc, yticks, yticklabels, current_time, params['init_sub_e_gluc'], 'Se', folder_string, param_string, params, run)
+        hf.plot_externalsub_hyphae(sub_e_gluc, mycelia, num_total_segs, yticks, yticklabels, current_time, params['init_sub_e_gluc'], 'Se', folder_string, param_string, params, run)
+        
         max_e_treha = np.max(sub_e_treha)
         hf.plot_externalsub_treha(sub_e_treha, yticks, yticklabels, current_time, max_e_treha, 'Se', folder_string, param_string, params, run)
+        hf.plot_externalsub_treha_hyphae(sub_e_treha, mycelia, num_total_segs, yticks, yticklabels, current_time, max_e_treha, 'Se', folder_string, param_string, params, run)
+            
     
     for i in range(num_total_segs):
         if mycelia['branch_id'][i]==-1:

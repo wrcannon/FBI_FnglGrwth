@@ -9,7 +9,9 @@ Created on Tue Sep 15 17:17:45 2020
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import collections, colors, transforms
 import seaborn as sns
+import sys
 import pylab as pl
 from matplotlib import collections  as mc
 sns.set_style('white')
@@ -19,6 +21,7 @@ import configparser
 from matplotlib import cm
 from matplotlib.colors import ListedColormap,LinearSegmentedColormap
 
+np.set_printoptions(threshold=sys.maxsize)
 
 # ----------------------------------------------------------------------------
 # SET UP FUNCTIONS
@@ -224,12 +227,11 @@ def get_filepath(params):
     #     params['ku1_gluc'], params['Ku2_gluc'], params['yield_u'],
     #     params['kc1_gluc'], params['Kc2_gluc'], params['yield_c'],
     #     params['kg1_wall'], params['Kg2_wall'], params['yield_g'])
-    # file_string = "oldD2Tip_Fus_tipRe_brRate1e9_resBr4_noBkDiffLowGluc2_bkPatchy_Trsloc_4init"
-    # file_string = "recalibration_02242022"
     #file_string = "NoFusion_tipRel_patch3Env_initGluc2um_branch0_3_brCost1x_t1"
-    file_string = "NoFusion_AllHyphRelease_homogenousEnv_initGluc20mm_branch0_3_brCost1x_200x200x0.20umGrid"
-    #file_string = "test"
-    #file_string = "noFusion_tipRel_homogenousEnv"
+    file_string = "NoFusion_AllHyphRelease_homogenousEnv_initGluc20mm_branch0_3_brCost1x_50x50x0.20umGrid"
+    #file_string = "Fusion_AllHyphRelease_patchyEnv_initGluc20mm_branch0_3_brCost1x_200x200x0.20umRandomGrid"
+    #file_string = "test2"
+
     return folder_string, file_string
 
 
@@ -240,13 +242,19 @@ def get_filepath(params):
 def output_hyphal_coordinates(segments, hyphal_coord_file):
     thisfile = open(hyphal_coord_file, 'w')
     for i in range(np.shape(segments)[0]): 
-        print(segments[i],file=thisfile)
+        print(*segments[i],sep=', ',file=thisfile)
     thisfile.close()
 
 def output_extern_concs(sub_e, extern_conc_file):
     thisfile = open(extern_conc_file, 'w')
-    for i in range(np.shape(sub_e)[0]): 
-        print(sub_e[i],file=thisfile)
+    max_i, max_j = np.shape(sub_e) 
+    #for i in range(max_i): 
+    #    for j in range(max_j-1): 
+    #        print(sub_e[i,j],sep = ', ',file=thisfile)
+    #    print(sub_e[i,max_j-1],'\n',file=thisfile)
+    for i in range(max_i): 
+        print(sub_e[i],sep = ', ',file=thisfile)
+
     thisfile.close()
 
 def plot_fungus(mycelia, num_total_segs, curr_time, folder_string, param_string, params, run):
@@ -271,8 +279,9 @@ def plot_fungus(mycelia, num_total_segs, curr_time, folder_string, param_string,
 
     """
     # cur_len = len(hy)
-    si_conc = mycelia['cw_i']/mycelia['seg_vol'] *1.0e12
+    si_conc = mycelia['cw_i'][:num_total_segs]/mycelia['seg_vol'][:num_total_segs] *1.0e12
     idx_to_display = np.intersect1d(np.where(mycelia['branch_id'][:num_total_segs]>-1)[0], np.where(np.isfinite(si_conc))[0])
+
     si = si_conc[idx_to_display].flatten()
     x1 = mycelia['xy1'][idx_to_display, 0].tolist()
     x2 = mycelia['xy2'][idx_to_display, 0].tolist()
@@ -295,6 +304,11 @@ def plot_fungus(mycelia, num_total_segs, curr_time, folder_string, param_string,
     segments = []
     for xi1, yi1, xi2, yi2 in zip(x1, y1, x2, y2):
         segments.append([(xi1, yi1), (xi2, yi2)])
+    
+    segments_xyz_concs = []
+
+    for xi1, yi1, xi2, yi2, concsi in zip(x1, y1, x2, y2, si_conc):
+        segments_xyz_concs.append((xi1, yi1, xi2, yi2, concsi[0]))
 
     # Generated plot
     fig, ax = pl.subplots(dpi=600)
@@ -333,7 +347,7 @@ def plot_fungus(mycelia, num_total_segs, curr_time, folder_string, param_string,
                                                                         param_string,
                                                                         curr_time,
                                                                         run)
-    output_hyphal_coordinates(segments, hyphal_coord_file)
+    output_hyphal_coordinates(segments_xyz_concs, hyphal_coord_file)
 #    print(hyphal_coord_file)
 #    thisfile = open(hyphal_coord_file, 'w')
 #    print(type(thisfile))
@@ -626,6 +640,8 @@ def plot_fungus_treha(mycelia, num_total_segs, curr_time, folder_string, param_s
     orange_blue = ListedColormap(newcolors, name='OrangeBlue')
 
     # Plot linesegments with coloring according to internal substrate conc.
+    #offs = (0.0, 0.0)
+    #lc = mc.LineCollection(segments, offsets=offs, array=si, cmap=cm.jet)#orange_blue)
     lc = mc.LineCollection(segments, array=si, cmap=cm.jet)#orange_blue)
     lc.set_linewidth(1)
     ax.add_collection(lc)
@@ -757,7 +773,7 @@ def plot_externalsub(sub_e, yticks, y_tick_labels, curr_time, sub_e_max, plot_ty
     Parameters
     ----------
     sub_e : 2D numpy array
-        Matrix containing external nutrient concentration values at discritized grid points.
+        Matrix containing external nutrient mole values at discritized grid points.
     yticks : list
         Helps determine how many labels appear of x- and y-axes.
     yticklabels : list
@@ -781,7 +797,7 @@ def plot_externalsub(sub_e, yticks, y_tick_labels, curr_time, sub_e_max, plot_ty
     # Convert to molar quantities for display
     sub_e = np.log10(sub_e/params['vol_grid']*1e12)
     inf_idx = np.where(np.isinf(sub_e)) 
-    sub_e[inf_idx] = -8.0
+    sub_e[inf_idx] = np.min(sub_e[np.where(np.isfinite(sub_e))])-1
     sub_e_max = np.max(sub_e)
     
     # For the orange-blue color map
@@ -841,6 +857,127 @@ def plot_externalsub(sub_e, yticks, y_tick_labels, curr_time, sub_e_max, plot_ty
     fig.savefig(fig_name, bbox_inches="tight")
     plt.close()
 
+def plot_externalsub_hyphae(sub_e, mycelia, num_total_segs, yticks, y_tick_labels, curr_time, sub_e_max, plot_type, folder_string, param_string, params, run):
+    """
+    Parameters
+    ----------
+    sub_e : 2D numpy array
+        Matrix containing external nutrient concentration values at discritized grid points.
+    yticks : list
+        Helps determine how many labels appear of x- and y-axes.
+    yticklabels : list
+        Values to appear on the x- and y-axes.
+    curr_time : double
+        The current time of simulation, in days.
+    sub_e_max : double
+        Largest possible value for external substrate concentration.
+    param_string : str
+        Used to create filename of saved plot.
+
+    Returns
+    -------
+    None.
+
+    Purpose
+    -------
+    Plot external nutrient concentration.
+
+    """
+    # Convert to molar quantities for display
+    sub_e = np.log10(sub_e/params['vol_grid']*1e12)
+    inf_idx = np.where(np.isinf(sub_e)) 
+    sub_e[inf_idx] = np.min(sub_e[np.where(np.isfinite(sub_e))])-1
+    sub_e_max = np.max(sub_e)
+    
+    # For the orange-blue color map
+    top = cm.get_cmap('Oranges_r', 256) # r means reversed version
+    bottom = cm.get_cmap('Blues', 256)# combine it all
+    newcolors = np.vstack((top(np.linspace(0, 1, 256)),
+                           bottom(np.linspace(0, 1, 256))))# create a new colormaps with a name of OrangeBlue
+    orange_blue = ListedColormap(newcolors, name='OrangeBlue')
+
+    # Convert units
+    if params['plot_units_time'] == 'days':
+        plot_time = curr_time / (60*60*24)
+    elif params['plot_units_time'] == 'hours':
+        plot_time = curr_time / (60*60)
+    elif params['plot_units_time'] == 'minutes':
+        plot_time = curr_time / 60
+    elif params['plot_units_time'] == 'seconds':
+        plot_time = curr_time
+    # breakpoint()
+    # Plot
+    if plot_type == 'Se':
+        ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmax=sub_e_max, xticklabels=y_tick_labels, yticklabels=y_tick_labels)
+    # elif plot_type == 'Ce':
+    #     ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmin=0, xticklabels=yticklabels, yticklabels=yticklabels)
+    # breakpoint()
+    ax.set_yticks(yticks)
+    ax.set_xticks(yticks)
+    if plot_type == 'Se':
+        ax.collections[0].colorbar.set_label("External Glucose\n Log Conc. (Molar)")
+        ax.set_title('External Domain \nTime = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
+    elif plot_type == 'Ce':
+        ax.collections[0].colorbar.set_label("Chemical Inhibitor Concentration")
+        ax.set_title('Chemical Domain \nTime = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
+
+    ax.set_xticklabels(y_tick_labels)
+    ax.set(xticklabels=y_tick_labels)
+    ax.set_yticklabels(y_tick_labels)
+    ax.set(yticklabels=y_tick_labels)
+    
+    ax.set_ylabel('{}'.format(params['plot_units_space']))
+    ax.set_xlabel('{}'.format(params['plot_units_space']))
+    ax.invert_yaxis()
+    #ax.axis('equal')
+    ax.margins(0.1)
+    # ax.set(yticklabels=[])
+    # ax.set(xticklabels=[])
+    # ax.invert_xaxis()
+    #plt.show()
+
+    # Now plot hyphae:
+    ngrids = len(sub_e)
+    max_xy = np.max(y_tick_labels)
+
+    si_conc = mycelia['gluc_i']/mycelia['seg_vol'] *1.0e12
+    idx_to_display = np.intersect1d(np.where(mycelia['branch_id'][:num_total_segs]>-1)[0], np.where(np.isfinite(si_conc))[0])
+    si = si_conc[idx_to_display].flatten()
+    x1 = (mycelia['xy1'][idx_to_display, 0]*ngrids/2/max_xy + ngrids/2).tolist()
+    x2 = (mycelia['xy2'][idx_to_display, 0]*ngrids/2/max_xy + ngrids/2).tolist()
+    y1 = (mycelia['xy1'][idx_to_display, 1]*ngrids/2/max_xy + ngrids/2).tolist()
+    y2 = (mycelia['xy2'][idx_to_display, 1]*ngrids/2/max_xy + ngrids/2).tolist()
+
+    if any(si < 1.0e-9):
+        #min_value = min(si[(si > 1.0e-9)])
+        si[np.where(si < 1.0e-9)] = 1.0e-09
+    si = np.log10(si)
+   
+    segments = []
+    for xi1, yi1, xi2, yi2 in zip(x1, y1, x2, y2):
+        segments.append([(xi1, yi1), (xi2, yi2)])
+
+    # Plot linesegments with coloring according to internal substrate conc.
+    #offset = (1.0, 1.0)
+    #lc = mc.LineCollection(segments, offsets = offset, array=si, cmap=orange_blue)
+    lc = mc.LineCollection(segments, array=si, cmap=orange_blue)
+    lc.set_linewidth(1)
+    ax.add_collection(lc)
+
+    # End plot of hyphae
+
+    fig_name = "Results/{}/Run{}/{}_t={:0.2f}_external_gluc_hyphae_{}_{}.png".format(param_string,
+                                                                        run,
+                                                                        param_string,
+                                                                        curr_time,
+                                                                        plot_type,
+                                                                        run)
+    plt.tight_layout()
+    fig = ax.get_figure()
+    fig.savefig(fig_name, bbox_inches="tight")
+    plt.close()
+
+
 def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plot_type, folder_string, param_string, params, run):
     """
     Parameters
@@ -869,10 +1006,12 @@ def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plo
     """
     # Convert to molar quantities for display
     sub_e = np.log10(sub_e/params['vol_grid']*1e12) 
+    sub_e_max = np.max(sub_e[np.where(np.isfinite(sub_e))])
+
     sub_e[np.where(np.isinf(sub_e))] = np.min(sub_e[np.where(np.isfinite(sub_e))])-1
+    #sub_e[np.where(np.isinf(sub_e))] = 10*sub_e_max
     
 
-    sub_e_max = np.max(sub_e)
 
 
     # For the orange-blue color map
@@ -892,7 +1031,7 @@ def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plo
     elif params['plot_units_time'] == 'seconds':
         plot_time = curr_time
 
-    extern_conc_file = "Results/{}/Run{}/{}_t={:0.2f}_external_concentrations_run{}.txt".format(param_string,
+    extern_conc_file = "Results/{}/Run{}/{}_t={:0.2f}_external_logConcentrations_run{}.txt".format(param_string,
                                                                         run,
                                                                         param_string,
                                                                         curr_time,
@@ -902,7 +1041,9 @@ def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plo
     # Plot
     if plot_type == 'Se':
         #ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmax=sub_e_max)#, xticklabels=yticklabels, yticklabels=yticklabels)
-        ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmax=sub_e_max)#, xticklabels=yticklabels, yticklabels=yticklabels)
+        #ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmax=sub_e_max)#, xticklabels=yticklabels, yticklabels=yticklabels)
+        ax = sns.heatmap(sub_e, cmap=orange_blue, vmax=sub_e_max)#, xticklabels=yticklabels, yticklabels=yticklabels)
+
     # elif plot_type == 'Ce':
     #     ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmin=0, xticklabels=yticklabels, yticklabels=yticklabels)
     # breakpoint()
@@ -928,6 +1069,132 @@ def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plo
     # ax.invert_xaxis()
     #plt.show()
     fig_name = "Results/{}/Run{}/{}_t={:0.2f}_external{}_{}.png".format(param_string,
+                                                                        run,
+                                                                        param_string,
+                                                                        curr_time,
+                                                                        plot_type,
+                                                                        run)
+    plt.tight_layout()
+    fig = ax.get_figure()
+    fig.savefig(fig_name, bbox_inches="tight")
+    plt.close(fig)
+# ----------------------------------------------------------------------------
+
+def plot_externalsub_treha_hyphae(sub_e, mycelia, num_total_segs, yticks, yticklabels, curr_time, sub_e_max, plot_type, folder_string, param_string, params, run):
+    """
+    Parameters
+    ----------
+    sub_e : 2D numpy array
+        Matrix containing external nutrient concentration values at discritized grid points.
+    yticks : list
+        Helps determine how many labels appear of x- and y-axes.
+    yticklabels : list
+        Values to appear on the x- and y-axes.
+    curr_time : double
+        The current time of simulation, in days.
+    sub_e_max : double
+        Largest possible value for external substrate concentration.
+    param_string : str
+        Used to create filename of saved plot.
+
+    Returns
+    -------
+    None.
+
+    Purpose
+    -------
+    Plot external nutrient concentration.
+
+    """
+    # Convert to molar quantities for display
+    sub_e = np.log10(sub_e/params['vol_grid']*1e12) 
+    sub_e_max = np.max(sub_e[np.where(np.isfinite(sub_e))])
+
+    sub_e[np.where(np.isinf(sub_e))] = np.min(sub_e[np.where(np.isfinite(sub_e))])-1
+    #sub_e[np.where(np.isinf(sub_e))] = 10*sub_e_max
+    
+
+
+
+    # For the orange-blue color map
+    top = cm.get_cmap('Oranges_r', 256) # r means reversed version
+    bottom = cm.get_cmap('Blues', 256)# combine it all
+    newcolors = np.vstack((top(np.linspace(0, 1, 256)),
+                           bottom(np.linspace(0, 1, 256))))# create a new colormaps with a name of OrangeBlue
+    orange_blue = ListedColormap(newcolors, name='OrangeBlue')
+
+    # Convert units
+    if params['plot_units_time'] == 'days':
+        plot_time = curr_time / (60*60*24)
+    elif params['plot_units_time'] == 'hours':
+        plot_time = curr_time / (60*60)
+    elif params['plot_units_time'] == 'minutes':
+        plot_time = curr_time / 60
+    elif params['plot_units_time'] == 'seconds':
+        plot_time = curr_time
+
+    # breakpoint()
+    # Plot
+    if plot_type == 'Se':
+        #ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmax=sub_e_max)#, xticklabels=yticklabels, yticklabels=yticklabels)
+        ax = sns.heatmap(np.rot90(sub_e, k=1, axes=(0,1)), cmap=orange_blue, vmax=sub_e_max)#, xticklabels=yticklabels, yticklabels=yticklabels)
+        #ax = sns.heatmap(sub_e, cmap=orange_blue, vmax=sub_e_max)#, xticklabels=yticklabels, yticklabels=yticklabels)
+    # elif plot_type == 'Ce':
+    #     ax = sns.heatmap(np.transpose(sub_e), cmap=orange_blue, vmin=0, xticklabels=yticklabels, yticklabels=yticklabels)
+    # breakpoint()
+    ax.set_yticks(yticks)
+    ax.set_xticks(yticks)
+    
+    ax.set_yticklabels(yticklabels)
+    ax.set_xticklabels(yticklabels)
+    if plot_type == 'Se':
+        ax.collections[0].colorbar.set_label("External Trehalose\n Log Conc. (Molar)")
+        ax.set_title('External Domain \nTime = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
+    elif plot_type == 'Ce':
+        ax.collections[0].colorbar.set_label("Chemical Inhibitor Concentration")
+        ax.set_title('Chemical Domain \nTime = {:0.2f} {}'.format(plot_time, params['plot_units_time']),fontweight="bold")
+
+    ax.set_ylabel('{}'.format(params['plot_units_space']))
+    ax.set_xlabel('{}'.format(params['plot_units_space']))
+    ##ax.invert_yaxis()
+    #ax.axis('equal')
+    ax.margins(1.9)
+    # ax.set(yticklabels=[])
+    # ax.set(xticklabels=[])
+    # ax.invert_xaxis()
+    #plt.show()
+
+    # Now plot hyphae:
+    ngrids = len(sub_e)
+    max_xy = np.max(yticklabels)
+
+    si_conc = mycelia['treha_i']/mycelia['seg_vol'] *1.0e12
+    idx_to_display = np.intersect1d(np.where(mycelia['branch_id'][:num_total_segs]>-1)[0], np.where(np.isfinite(si_conc))[0])
+    si = si_conc[idx_to_display].flatten()
+    x1 = (mycelia['xy1'][idx_to_display, 0]*ngrids/2/max_xy + ngrids/2).tolist()
+    x2 = (mycelia['xy2'][idx_to_display, 0]*ngrids/2/max_xy + ngrids/2).tolist()
+    y1 = (mycelia['xy1'][idx_to_display, 1]*ngrids/2/max_xy + ngrids/2).tolist()
+    y2 = (mycelia['xy2'][idx_to_display, 1]*ngrids/2/max_xy + ngrids/2).tolist()
+
+    if any(si < 1.0e-9):
+        #min_value = min(si[(si > 1.0e-9)])
+        si[np.where(si < 1.0e-9)] = 1.0e-09
+    si = np.log10(si)
+    
+    segments = []
+    for xi1, yi1, xi2, yi2 in zip(x1, y1, x2, y2):
+        segments.append([(xi1, yi1), (xi2, yi2)])
+
+    # Plot linesegments with coloring according to internal substrate conc.
+    #offset = (1.0, 1.0)
+    #lc = mc.LineCollection(segments, offsets = offset, array=si, cmap=orange_blue)
+    lc = mc.LineCollection(segments, array=si, cmap=orange_blue)
+    lc.set_linewidth(1)
+    ax.add_collection(lc)
+
+    # End plot of hyphae
+
+    fig_name = "Results/{}/Run{}/{}_t={:0.2f}_external{}_hyphae_{}.png".format(param_string,
                                                                         run,
                                                                         param_string,
                                                                         curr_time,
