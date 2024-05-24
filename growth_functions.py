@@ -113,9 +113,14 @@ def map_to_grid(mycelia, idx, num_total_segs, x_vals, y_vals):
     e_overlap = list(map(lambda x: np.array_equal(x, xy_e), mycelia['xy_e_idx'][:num_total_segs,:]))
     # print(e_overlap)
     mycelia['xy_e_idx'][idx,:] = xy_e
-    if any(e_overlap):
-        mycelia['share_e'][np.where(e_overlap)[0][0]].append(idx)
-        mycelia['share_e'][idx].append(np.where(e_overlap)[0][0])
+
+    if any(e_overlap): # If there is overlap, append the segment index
+        #mycelia['share_e'][np.where(e_overlap)[0][0]].append(idx) # # Append the idx to the shared list for the overlapping indices
+        #mycelia['share_e'][idx].append(np.where(e_overlap)[0][0]) # Append the overlapping indices to the shared list for index idx
+        for i, val in enumerate(e_overlap):
+            if val:
+                mycelia['share_e'][idx].append(i)
+                mycelia['share_e'][i].append(idx)
 
     return mycelia
 
@@ -657,18 +662,12 @@ def extension(mycelia, num_total_segs, dtt, x_vals, y_vals,
     if not tip_idxs:
         return mycelia, num_total_segs, dtt
 
-    use_original = 0
-    if(use_original == 1):
-        extend_len = params['dt_i']*michaelis_menten(params['kg1_wall'],
-                                                   params['Kg2_wall'],
-                                                   params['yield_g']*params['mw_cw']*mycelia['cw_i'][tip_idxs])
-    else:   
-        #K = params['Kg2_wall'] * mycelia['hyphal_vol']
-        dLdt = michaelis_menten(params['kg1_wall'],
+    #K = params['Kg2_wall'] * mycelia['hyphal_vol']
+    dLdt = michaelis_menten(params['kg1_wall'],
                         params['Kg2_wall'],
                         mycelia['cw_i'][tip_idxs])
-        #extend_len = params['dt']*dLdt
-        extend_len = params['dt_i']*params['kg1_wall']*np.ones(np.shape([tip_idxs])).T
+    #extend_len = params['dt']*dLdt
+    extend_len = params['dt_i']*params['kg1_wall']*np.ones(np.shape([tip_idxs])).T
     
     if any(extend_len > 1e2):
         breakpoint()
@@ -762,6 +761,7 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals,
         potential_branch_idxs = (np.where(mycelia['can_branch'])[0])
     else:
         tmp_potential_branch_idxs = np.where(mycelia['can_branch'])[0]
+        # dtt is the distance - number of segments - to the nearest tip
         restricting = np.where(dtt[tmp_potential_branch_idxs]<=restrictBranching)[0]
         potential_branch_idxs = (tmp_potential_branch_idxs[restricting])
         # if np.max(num_total_segs > 8):
@@ -777,8 +777,8 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals,
         true_branch_ids = potential_branch_idxs[np.where((rand_vals - params['branch_rate']*mycelia['cw_i'][potential_branch_idxs]) < 0)[0]]
         
     else:
-        advection_vel_cw = params['advection_vel_cw']
-        K_cw = advection_vel_cw*params['dt_i']
+        active_trsprt_vel_cw = params['active_trsprt_vel_cw']
+        K_cw = active_trsprt_vel_cw*params['dt_i']
         alpha_cw = michaelis_menten(1, K_cw, 
                                 mycelia['cw_i'][:num_total_segs])
         nutrient_scaling = 1.0 #rich media
@@ -813,13 +813,6 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals,
 
         
     if any(true_branch_ids):
-        if(use_original ==1):
-            branch_len = params['dt_i']*michaelis_menten(params['kg1_wall'],
-                                                   params['Kg2_wall'],
-                                                   params['yield_g']*params['mw_cw']*mycelia['cw_i'][true_branch_ids])
-
-            branch_len, cost_branch_gluc, cost_branch_cw = cost_of_growth(mycelia, np.array(true_branch_ids), branch_len)
-        
         # If nutrient to extend, update tip
         if max(branch_len) > 0:
 

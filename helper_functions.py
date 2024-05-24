@@ -62,7 +62,7 @@ def get_configs(config_filename):
     dz = discrete_params.getfloat('grid_height')
     vol_grid = dy*dy*dz
     diff_e_gluc = nutrient_params.getfloat('diffusion_e_gluc')
-    convert_for_export = nutrient_params.getfloat('convert_for_export')
+    convert_metabolite = nutrient_params.getfloat('convert_metabolite')
     diff_i_gluc = nutrient_params.getfloat('diffusion_i_gluc')
     kg1_wall = nutrient_params.getfloat('kg1_wall')
     hy_density =  growth_params.getfloat('hy_density')
@@ -72,15 +72,19 @@ def get_configs(config_filename):
     mw_cw = nutrient_params.getfloat('mw_cw')
 
     # dt = 0.99*(dy**2)/(4*diff_e_gluc)
-    #dt = 0.75*min((sl**2/diff_i_gluc),(sl/kg1_wall)) #kg1_wall should be advection rate
-    advection_vel_cw = kg1_wall*cross_area*hy_density*1.0e+12*f_dw*f_wall*f_cw_cellwall \
+    #dt = 0.75*min((sl**2/diff_i_gluc),(sl/kg1_wall)) # kg1_wall is radial growth rate and advection rate
+    
+    # The maximum rate of active transport is set to be the product of the maximum rate of radial growth, 
+    # the cross sectional area of the hyphae, the dry weight of the cell, the fraction of the dry weight that is cell wall material,
+    # and divided by the formula weight of the cell wall material,
+    active_trsprt_vel_cw = kg1_wall*cross_area*hy_density*1.0e+12*f_dw*f_wall*f_cw_cellwall \
         /mw_cw
-    advection_constant_gluc = kg1_wall*init_vol_seg #kg1_wall is the rate that the hyphae grows in one dimension. 
+    advection_constant_gluc = kg1_wall*init_vol_seg # kg1_wall is the radial rate. 
                                                     # scaling it by the volume of the hyphae gives the rate that glucose
                                                     # would spread in 2-dimensions per second.
 
     #dt = 0.0025*min((sl**2/diff_i_gluc),(sl/kg1_wall)) #kg1_wall should be advection rate
-    dt_i = 0.01*min((sl**2/diff_i_gluc),1/(advection_vel_cw*0.02))
+    dt_i = 0.01*min((sl**2/diff_i_gluc),1/(active_trsprt_vel_cw*0.02))
     dt_e = 0.01*(dy**2/diff_e_gluc)
     #dt = min(dt, dy**2/(diff_e_gluc))
     #dt = 0.01*dt
@@ -133,7 +137,7 @@ def get_configs(config_filename):
         'init_sub_e_gluc' : nutrient_params.getfloat('init_sub_e_gluc')*vol_grid,
         'init_sub_e_treha' : nutrient_params.getfloat('init_sub_e_treha')*vol_grid,
         'diffusion_e_gluc' : diff_e_gluc,
-        'convert_for_export': convert_for_export,
+        'convert_metabolite': convert_metabolite,
 
         'init_sub_i_gluc' : nutrient_params.getfloat('init_sub_i_gluc'),
         'diffusion_i_gluc' : nutrient_params.getfloat('diffusion_i_gluc'),
@@ -155,10 +159,9 @@ def get_configs(config_filename):
         'kg1_wall' : nutrient_params.getfloat('kg1_wall'),
         # 'Kg2_wall' : nutrient_params.getfloat('Kg2_wall')*vol_seg,
         'Kg2_wall' : nutrient_params.getfloat('Kg2_wall'),
-        'yield_g' : nutrient_params.getfloat('yield_g'),
         'mw_cw' : nutrient_params.getfloat('mw_cw'),
         'mw_glucose' : nutrient_params.getfloat('mw_glucose'),
-        'advection_vel_cw' : advection_vel_cw,
+        'active_trsprt_vel_cw' : active_trsprt_vel_cw,
 
         'num_v' : nutrient_params.getfloat('num_v')
     }
@@ -217,6 +220,7 @@ def get_filepath(params):
     #folder_string = "noFusion_tipRel_homogenousEnv_convert"
     #folder_string = "NoFusion_NoTipRel_homogenousEnv_initGluc20mm_branch0_3_brCost1x_seg=400"
     folder_string = "NoFusion_NoTipRel_homogenousEnv_initGluc20mm_branch0_3_brCost1x_t1"
+    folder_string = "test2"
     # file_string = "{}_b={:.3e}_ieg={}_deg={}_iig={:.3e}_dig={}_vw={}_kyu={},{:.3e},{}_kyc={:.3e},{:.3e},{}_kyg={},{:.3e},{}".format(
     #     folder_string,
     #     params['branch_rate'],
@@ -226,11 +230,11 @@ def get_filepath(params):
     #     params['vel_wall'],
     #     params['ku1_gluc'], params['Ku2_gluc'], params['yield_u'],
     #     params['kc1_gluc'], params['Kc2_gluc'], params['yield_c'],
-    #     params['kg1_wall'], params['Kg2_wall'], params['yield_g'])
+    #     params['kg1_wall'], params['Kg2_wall'])
     #file_string = "NoFusion_tipRel_patch3Env_initGluc2um_branch0_3_brCost1x_t1"
     file_string = "NoFusion_AllHyphRelease_homogenousEnv_initGluc20mm_branch0_3_brCost1x_50x50x0.20umGrid"
     #file_string = "Fusion_AllHyphRelease_patchyEnv_initGluc20mm_branch0_3_brCost1x_200x200x0.20umRandomGrid"
-    #file_string = "test2"
+    file_string = "test2"
 
     return folder_string, file_string
 

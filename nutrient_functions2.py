@@ -387,28 +387,24 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
         
     Purpose
     -------
-    Calculate the change in nutrients due to translocation (diffusion of glucose,
+    Calculate the change in nutrients due to translocation (diffusion, advection,
     conversion of glucose to cell wall materials, active transport of cell wall
     materials)
     """
-    # Conversion Term: How much glucose is used by metabolism? (Actually, all of it
-    # so I think the update of gluc_i needs to reflect that)
-    use_original = 0
+    #%% Set initial conditions and variables:
     alpha_gluc = gf.michaelis_menten(1, 
                           params['Kc2_gluc'], 
                           mycelia['gluc_i'][:num_total_segs])
 
 
     # Matrix of values for seg j
-    # This next line is not correct - the glucose values are at steady state with respect to metabolism
-    # mycelia['gluc_i'][:num_total_segs] = mycelia['gluc_i'][:num_total_segs] - params['dt']*convert_term
     negative_gluc_i_idx = np.where(mycelia['gluc_i'][:num_total_segs] < 0)[0]
     if len(negative_gluc_i_idx)>0:
         print('Glucose below 0.0:',np.min(mycelia['gluc_i'][:num_total_segs]))
         mycelia['gluc_i'][negative_gluc_i_idx] = np.finfo(np.float64).tiny;
         #breakpoint()
     gluc_curr = mycelia['gluc_i'][:num_total_segs]
-    #seg_volume = mycelia['seg_vol'][:num_total_segs] mycelia['seg_vol'] doesn't appear to be getting updated 
+    
     seg_lengths = mycelia['seg_length'][:num_total_segs]
     seg_volume = seg_lengths*params['cross_area']
     gluc_curr_concentrations = gluc_curr/seg_volume
@@ -421,6 +417,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
     cw_curr_concentrations = cw_curr/seg_volume
     treha_curr_concentrations = treha_curr/seg_volume
 
+    #%% Diffusion:
     # Diffusion Term: sum_{nbr in nbrs} (D/L)*(nbr - self)
     d2gluc_dx2 = np.zeros((num_total_segs,1))
     d2treha_dx2 = np.zeros((num_total_segs,1))
@@ -460,7 +457,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
             from_nbrs.append([])
             continue
         
-        # Advection is to the closest tip. Find the immediate neighbors that are closer to tips.
+        # Advection is to the closest tip. Assume that diffusion is too. Find the immediate neighbors that are closer to tips.
         # If a segment is equally close to two tips, then the advection is toward both tips.
         if len(np.where(dtt[nbr_of_idx] < dtt[idx])[0]) and (mycelia['branch_id'][idx])>-1: 
             chosen_idx = np.array(np.where(dtt[nbr_of_idx] < dtt[idx])[0])
@@ -625,7 +622,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
     if(num_total_segs == 8):
         x = 1
 
-    # Metabolism:
+    #%% Metabolism:
     # Update concentrations due to metabolic activity:
     alpha_gluc = gf.michaelis_menten(1, 
                           params['Kc2_gluc'], 
@@ -646,7 +643,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
     mycelia['gluc_i'][:num_total_segs] -= params['dt_i']*convert_term
     mycelia['cw_i'][:num_total_segs] += params['dt_i']*(params['yield_c_in_mmoles']*convert_term)
     #mycelia['treha_i'][:num_total_segs] += params['dt']*(convert_term*0.3*0.1)
-    mycelia['treha_i'][:num_total_segs] += params['dt_i']*(convert_term*params['convert_for_export'])
+    mycelia['treha_i'][:num_total_segs] += params['dt_i']*(convert_term*params['convert_metabolite'])
 
     negative_cw_i_idx = np.where(mycelia['cw_i'][:num_total_segs] < 0)[0]
     negative_treha_i_idx = np.where(mycelia['treha_i'][:num_total_segs] < 0)[0]
@@ -668,7 +665,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
 
     #print('Metabolism - gluc_curr:',mycelia['gluc_i'][:num_total_segs])
 
-    # Advection:
+    #%% Advection (glucose and trehalose) and Active Transport (cell wall materials):
 
     # Get current counts/concentrations after diffusion:
     gluc_curr = mycelia['gluc_i'][:num_total_segs]
@@ -678,29 +675,26 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
     cw_curr_concentrations = cw_curr/seg_volume
     treha_curr_concentrations = treha_curr/seg_volume     
     
-    # The concentration imported from neighboring segments is scaled by the number of neighbors that the neighboring
-    #  segment must export to. For a linear hyphae, a middle segment must export to two neighbors. For a segment that is
-    # one leg of an X, there are three neighbors. for a segment in the middle of a Y_ structure, there are likewise three - two at the top of the Y and
-    # one at the bottom
-
-    cw_curr_mod = cw_curr_concentrations #This is the amount of cell wall material already present (before metabolism made more)
+    
+    cw_curr_mod = cw_curr_concentrations #This is the amount of cell wall material present (after metabolism made more)
                                       #in the hyphal compartment 
                                       #that can also be transported out of the compartment.
     treha_curr_mod = treha_curr_concentrations
     gluc_curr_mod = gluc_curr_concentrations
 
-    # Don't export from tip
+    # Don't transport from tip
     cw_curr_mod[np.where(mycelia['is_tip'][:num_total_segs])[0]] = 0
  
     cw_delta_count = np.zeros((num_total_segs,1))
     gluc_delta_count = np.zeros((num_total_segs,1))
     treha_delta_count = np.zeros((num_total_segs,1))
 
-    # Rate/velocity of active transport. The units here are concentraton/sec
-    advection_vel_cw = params['advection_vel_cw']
-    advection_vel_gluc = advection_vel_cw*params['yield_c']
+    # Rate/velocity of active transport and advection. The units here are concentraton/sec
+    active_trsprt_vel_cw = params['active_trsprt_vel_cw']
+    advection_rate = active_trsprt_vel_cw # Advection and active transport rates are set the same.
+    advection_vel_gluc = advection_rate*params['yield_c']
     
-    K_cw = advection_vel_cw*params['dt_i'] #K_cw is now the maximum amount of material that can be transported in dt.
+    K_cw = active_trsprt_vel_cw*params['dt_i'] #K_cw is now the maximum amount of material that can be transported in dt.
     K_gluc = advection_vel_gluc*params['dt_i']
     
     # These logistic functions (alpha_*) will be used to scale the velocity due to metabolic activity. 
@@ -710,10 +704,15 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
     alpha_gluc2 = gf.michaelis_menten(1, K_gluc, 
                                 mycelia['gluc_i'][:num_total_segs])
 
-    cw_convect_term = np.zeros((num_total_segs,1))
-    gluc_convect_term = np.zeros((num_total_segs,1))
-    treha_convect_term = np.zeros((num_total_segs,1))
+    cw_transport_term = np.zeros((num_total_segs,1))
+    gluc_advection_term = np.zeros((num_total_segs,1))
+    treha_advection_term = np.zeros((num_total_segs,1))
 
+    # Advection and active transport are  to the closest tip. The to_nbr and from_nbr lists are calculated above in the diffusion section.
+    # The concentration imported from neighboring segments is scaled by the number of neighbors that the neighboring
+    # segment must export to. For a linear hyphae, a middle segment must export to two neighbors. For a segment that is
+    # one leg of an X, there are three neighbors. for a segment in the middle of a Y_ structure, there are likewise three - two at the top of the Y and
+    # one at the bottom
     for idx in range(num_total_segs):
 
 
@@ -752,9 +751,8 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
             cw_conc_diff = cw_from_scaled_nbrs - cw_curr_mod[idx]
             treha_conc_diff = treha_from_scaled_nbrs - treha_curr_mod[idx]
             gluc_conc_diff = gluc_from_scaled_nbrs - gluc_curr_mod[idx]
+
             # Get segment volumes for conversion of concentration to counts:
-            exprt = (cw_conc_diff < 0)
-            imprt = (cw_conc_diff >= 0)
             volume_use_cw[(cw_conc_diff < 0)] = seg_volume[idx] # If conc_diff < 0, outflow from idx
             try:
                 volume_use_cw[(cw_conc_diff >= 0)] = from_nbr_volume[(cw_conc_diff >= 0)] # If conc_diff > 0, inflow from idx
@@ -764,67 +762,67 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
             cw_delta_count[idx] = np.sum(cw_from_scaled_nbrs*from_nbr_volume) - cw_curr_mod[idx]*seg_volume[idx]
             exprt_amt = (len(to_nbrs[idx]) > 0) * 1.0
             # Advection without taking into account metabolism due to glucose
-            #cw_convect_term[idx] = advection_vel_cw* \
+            #cw_transport_term[idx] = active_trsprt_vel_cw* \
             #    (np.sum(1/len_to_nbrs[from_nbrs_idx]*alpha_cw[from_nbrs_idx])-exprt_amt*alpha_cw[idx])
             # Advection taking into account metabolism due to glucose
-            cw_convect_term[idx] = advection_vel_cw* \
+            cw_transport_term[idx] = active_trsprt_vel_cw* \
                 (np.sum(1/len_to_nbrs[from_nbrs_idx]*alpha_cw[from_nbrs_idx]*alpha_gluc[from_nbrs_idx])-exprt_amt*alpha_cw[idx]*alpha_gluc[idx])
 
-            gluc_convect_term[idx] = advection_vel_gluc* \
+            gluc_advection_term[idx] = advection_vel_gluc* \
                 (np.sum(1/len_to_nbrs[from_nbrs_idx]*alpha_gluc[from_nbrs_idx]*alpha_gluc2[from_nbrs_idx])-exprt_amt*alpha_gluc[idx]*alpha_gluc2[idx])
 
 
             if np.isnan(cw_delta_count[idx]):
                 breakpoint()
      
-    if (np.isnan(np.sum(cw_convect_term))):
+    if (np.isnan(np.sum(cw_transport_term))):
             breakpoint()
-    if (np.isnan(np.sum(treha_convect_term))):
+    if (np.isnan(np.sum(treha_advection_term))):
             breakpoint()
-    if (np.isnan(np.sum(gluc_convect_term))):
+    if (np.isnan(np.sum(gluc_advection_term))):
             breakpoint()
     
-    print('Mean glucose advection',np.mean(np.abs(gluc_convect_term[:num_total_segs])))
-    print('Net glucose advection',np.sum(gluc_convect_term[:num_total_segs]))
+    print('Mean glucose advection',np.mean(np.abs(gluc_advection_term[:num_total_segs])))
+    print('Net glucose advection',np.sum(gluc_advection_term[:num_total_segs]))
     print('Net cell wl diff',np.sum(cw_delta_count[:num_total_segs]))
-    print('Net cell wl advection',np.sum(cw_convect_term[:num_total_segs]))
+    print('Net cell wl active transport',np.sum(cw_transport_term[:num_total_segs]))
     print('Mean cell wl difference',np.mean(np.abs(cw_delta_count[:num_total_segs])))
-    print('Mean cell wl advection',np.mean(np.abs(cw_convect_term[:num_total_segs])))
-    print('Max cell wl advection',np.max(cw_convect_term[:num_total_segs]))
+    print('Mean cell wl active transport',np.mean(np.abs(cw_transport_term[:num_total_segs])))
+    print('Max cell wl active transport',np.max(cw_transport_term[:num_total_segs]))
     print('Max segment length',np.max(mycelia['seg_length']))
     ndensity = [len(i) for i in mycelia['share_e'][:num_total_segs]]
     print('Max segment density: ', np.max(ndensity))
     print('Mean segment density: ', np.mean(ndensity))
-    if (np.abs(np.sum(cw_convect_term[:num_total_segs])) > 1.0e-24):
-        print('Net Convection of CW greater than zero')
+    if (np.abs(np.sum(cw_transport_term[:num_total_segs])) > 1.0e-24):
+        print('Net active transport of CW greater than zero')
         #for idx in range(num_total_segs):
-        #    diffcw =  -cw_convect_term[idx]
+        #    diffcw =  -cw_transport_term[idx]
     # Sum/net advection should be zero:
-    relative_net_advection = np.abs(np.sum(gluc_convect_term[:num_total_segs]))/np.mean(np.abs(gluc_convect_term[:num_total_segs]))
+    relative_net_advection = np.abs(np.sum(gluc_advection_term[:num_total_segs]))/np.mean(np.abs(gluc_advection_term[:num_total_segs]))
     if (relative_net_advection > 1.0e-15):
         print('Glucose advection too high: ', relative_net_advection)
 
-    # Update concentrations due to convection
-    if (np.any(mycelia['cw_i'][:num_total_segs] + params['dt_i']*cw_convect_term < 0)):
-        bad_idx = np.where((mycelia['cw_i'][:num_total_segs] + params['dt_i']*cw_convect_term[:num_total_segs]) < 0)
+    # Update concentrations due to advection
+    if (np.any(mycelia['cw_i'][:num_total_segs] + params['dt_i']*cw_transport_term < 0)):
+        bad_idx = np.where((mycelia['cw_i'][:num_total_segs] + params['dt_i']*cw_transport_term[:num_total_segs]) < 0)
         print('Bad indices: ',bad_idx)
         print('Cell Wall before conversion:',mycelia['cw_i'][bad_idx])
-        print('Amount converted:',cw_convect_term[bad_idx]*params['dt_i'])
-        print('Convert rate:',cw_convect_term[bad_idx])
-        print('Cell Wall after conversion:',mycelia['cw_i'][bad_idx] + params['dt_i']*(cw_convect_term[bad_idx]))
+        print('Amount converted:',cw_transport_term[bad_idx]*params['dt_i'])
+        print('Convert rate:',cw_transport_term[bad_idx])
+        print('Cell Wall after conversion:',mycelia['cw_i'][bad_idx] + params['dt_i']*(cw_transport_term[bad_idx]))
         #breakpoint()
-       # Update concentrations due to convection
-    if (np.any(mycelia['gluc_i'][:num_total_segs] + params['dt_i']*gluc_convect_term < 0)):
-        bad_idx = np.where((mycelia['gluc_i'][:num_total_segs] + params['dt_i']*gluc_convect_term[:num_total_segs]) < 0)
+       # Update concentrations due to advection
+    if (np.any(mycelia['gluc_i'][:num_total_segs] + params['dt_i']*gluc_advection_term < 0)):
+        bad_idx = np.where((mycelia['gluc_i'][:num_total_segs] + params['dt_i']*gluc_advection_term[:num_total_segs]) < 0)
         print('Bad indices: ',bad_idx)
         print('Glucose before conversion:',mycelia['gluc_i'][bad_idx])
-        print('Amount converted:',gluc_convect_term[bad_idx]*params['dt_i'])
-        print('Convert rate:',gluc_convect_term[bad_idx])
-        print('Glucose after conversion:',mycelia['gluc_i'][bad_idx] + params['dt_i']*(gluc_convect_term[bad_idx]))
+        print('Amount converted:',gluc_advection_term[bad_idx]*params['dt_i'])
+        print('Convert rate:',gluc_advection_term[bad_idx])
+        print('Glucose after conversion:',mycelia['gluc_i'][bad_idx] + params['dt_i']*(gluc_advection_term[bad_idx]))
         #breakpoint()
 
-    mycelia['cw_i'][:num_total_segs] += params['dt_i']*(cw_convect_term)
-    mycelia['gluc_i'][:num_total_segs] += params['dt_i']*(gluc_convect_term)
+    mycelia['cw_i'][:num_total_segs] += params['dt_i']*(cw_transport_term)
+    mycelia['gluc_i'][:num_total_segs] += params['dt_i']*(gluc_advection_term)
     
     negative_cw_i_idx = np.where(mycelia['cw_i'][:num_total_segs] < 0)[0]
     negative_gluc_i_idx = np.where(mycelia['gluc_i'][:num_total_segs] < 0)[0]
@@ -841,6 +839,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
         breakpoint()
 
     #print('Advection - gluc_curr:',mycelia['gluc_i'][:num_total_segs])
+    #%% End of chemical transport and metabolism
 
     return mycelia
     
@@ -867,21 +866,21 @@ def uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd, time_step
 
     """
     
-    # All indicies of external grid used
+    # x,y indicies of external grid used for each segment
     xy_e_idx_og = mycelia['xy_e_idx'][:num_total_segs, :].astype(int)
     # breakpoint()
     # Reformat indicies
     xy_e_idx = tuple(np.transpose(xy_e_idx_og))
     
     # Glucose mmole values at grid points, not mMolar!
-    gluc_e = sub_e_gluc[xy_e_idx].copy()
+    gluc_e = sub_e_gluc[xy_e_idx].copy() # gluc_e contains, for each segment, the amount of glucose in the grid cell where each hyphae is located
     
     # Glucose inside the hyphae
     gluc_i = mycelia['gluc_i'][:num_total_segs].flatten()
     #if(np.any(gluc_i < 1.0e-16)):
     #    breakpoint()
     
-    # Amount in mmol taken up by each segment -RATE IS NOT CONCENTRATION/sec
+    # Amount in mmol taken up by each segment - That is, RATE IS NOT in CONCENTRATION/sec
     # gluc_uptake = params['dt']*gluc_e*gf.michaelis_menten(params['ku1_gluc'], 
     #                                                       params['Ku2_gluc'], 
     #                                                       gluc_i)
@@ -900,9 +899,12 @@ def uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd, time_step
     gluc_uptake = np.zeros(np.shape(relative_seg_vol))
     uptake_idx = np.where(relative_seg_vol > 0)
     no_uptake_idx = np.where(relative_seg_vol <= 0)
+    # Amount of glucose taken up by each segment
     gluc_uptake[uptake_idx] = time_step*gf.michaelis_menten(params['ku1_gluc'], 
                                                   params['Ku2_gluc']/relative_seg_vol[uptake_idx], 
                                                   gluc_e[uptake_idx])
+
+    
     try:
         gluc_uptake[no_uptake_idx] = 0.0
     except:
@@ -916,34 +918,42 @@ def uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd, time_step
         if mycelia['branch_id'][i] < 0:
             gluc_uptake[i] = 0.0
     
-    # List of a list containing segment IDs, if inner list length > 1, the IDs in same grid cell
+    # List of a list containing segment IDs, if inner list length > 1, the IDs are in same grid cell
+    # That is, for each segment i mycelia['share_e'][i] lists the segment IDs that share the same grid cell with segment i (based on thier point of origin)
     my_share = mycelia['share_e'][:num_total_segs]
 
     # Original amount taken up in each grid cell
-    gluc_up_sum = np.array([np.sum(gluc_uptake[i]) for i in my_share])
+    # really need a data structure that lists the segments that share each grid cell
+    gluc_up_sum = np.array([np.sum(gluc_uptake[lst]) for lst in my_share])
     # breakpoint()
     
-    if np.min(gluc_e - gluc_up_sum) >= 0:
-        #breakpoint()
-        # Update the amount of glucose in external grid cells
-        sub_e_gluc[xy_e_idx] = gluc_e - gluc_up_sum*var_nutrient_backgrnd
-        
-        # Update the amount of glucose in mmoles in internal segments
-        mycelia['gluc_i'][:num_total_segs] += params['yield_u']*gluc_uptake.reshape(-1,1)
-        # breakpoint()
-    else:
-        #breakpoint()
-        # Find the cells where too much is taken up
+    #if np.min(gluc_e - gluc_up_sum) >= 0: # If all glucose taken up is available in the grid cell
+    #    #breakpoint()
+    #    # Update the amount of glucose in external grid cells
+    #    sub_e_gluc[xy_e_idx] = gluc_e - gluc_up_sum*var_nutrient_backgrnd # This is per hyphae: for each hyphae, the amount of glucose
+    #                                                                      # in the grid cell where the hyphae is located
+    #                                                                      # Although, each grid cell will get updated as many times as the number of hyphae in that grid cell
+    #                                                                      # it doesn't matter because the amount of glucose in the grid cell is the same for all hyphae in the same grid cell
+    #    
+    #    # Update the amount of glucose in mmoles in internal segments
+    #    mycelia['gluc_i'][:num_total_segs] += params['yield_u']*gluc_uptake.reshape(-1,1)
+    #    # breakpoint()
+    #else: # If not all glucose estimated to be taken up is available in the grid cell
+    #    # Find the grid cells where too much is taken up
+    #    raw_difference = gluc_e - gluc_up_sum
+    #    raw_difference_neg_idx = np.where(raw_difference < 0)
+    #    raw_difference_pos_idx = np.where(raw_difference >=0)
+    #    sub_e_gluc[xy_e_idx] = gluc_e - gluc_up_sum*var_nutrient_backgrnd
+    #    gluc_uptake[raw_difference_neg_idx] = gluc_uptake[raw_difference_neg_idx]/gluc_up_sum[raw_difference_neg_idx] * gluc_e[raw_difference_neg_idx]
+    if np.min(gluc_e - gluc_up_sum) < 0: # If not all glucose estimated to be taken up is available in the grid cell        
+        # Find the grid cells where too much is taken up
         raw_difference = gluc_e - gluc_up_sum
         raw_difference_neg_idx = np.where(raw_difference < 0)
-        raw_difference_pos_idx = np.where(raw_difference >=0)
-        sub_e_gluc[xy_e_idx] = gluc_e - gluc_up_sum
-        
-        sub_e_gluc[xy_e_idx[0][raw_difference_neg_idx], xy_e_idx[1][raw_difference_neg_idx]] = 0.0
-        mycelia['gluc_i'][:num_total_segs] += params['yield_u']*gluc_uptake.reshape(-1,1)
-        # Modify gluc_uptake & gluc_up_sum
-        #breakpoint()
-    # breakpoint()
+        gluc_uptake[raw_difference_neg_idx] = gluc_uptake[raw_difference_neg_idx]/gluc_up_sum[raw_difference_neg_idx] * gluc_e[raw_difference_neg_idx]
+        gluc_up_sum[raw_difference_neg_idx] = gluc_e[raw_difference_neg_idx]
+
+    sub_e_gluc[xy_e_idx] = gluc_e - gluc_up_sum*var_nutrient_backgrnd
+    mycelia['gluc_i'][:num_total_segs] += params['yield_u']*gluc_uptake.reshape(-1,1)
     return mycelia
 
 def release(sub_e_treha, mycelia, num_total_segs, isTipRelease):
@@ -989,7 +999,6 @@ def release(sub_e_treha, mycelia, num_total_segs, isTipRelease):
     seg_lengths = mycelia['seg_length'][:num_total_segs]
     treha_release[np.where(seg_lengths*seg_lengths < 0.1*params['diffusion_i_gluc'])[0]] = 0.0
     # treha_release[np.where(seg_lengths*seg_lengths < 0.1*params['diffusion_i_gluc'])[0]] = 0.1*treha_release[np.where(seg_lengths*seg_lengths < 0.1*params['diffusion_i_gluc'])[0]] 
-    # treha_release = treha_i*0.1
     if tip_release == 0:
         negative_branch_ids = np.where(mycelia['branch_id'][:num_total_segs]<0)[0]
     else:
