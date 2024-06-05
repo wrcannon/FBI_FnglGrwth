@@ -791,8 +791,8 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
     print('Max cell wl active transport',np.max(cw_transport_term[:num_total_segs]))
     print('Max segment length',np.max(mycelia['seg_length']))
     ndensity = [len(i) for i in mycelia['share_e'][:num_total_segs]]
-    print('Max segment density: ', np.max(ndensity))
-    print('Mean segment density: ', np.mean(ndensity))
+    print('Max segment density per grid: ', np.max(ndensity))
+    print('Mean segment density per grid: ', np.mean(ndensity))
     if (np.abs(np.sum(cw_transport_term[:num_total_segs])) > 1.0e-24):
         print('Net active transport of CW greater than zero')
         #for idx in range(num_total_segs):

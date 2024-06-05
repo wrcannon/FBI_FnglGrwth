@@ -650,11 +650,16 @@ def extension(mycelia, num_total_segs, dtt, x_vals, y_vals,
     tip_idxs = (np.where(mycelia['is_tip'])[0]).tolist()
     # Get the number density of segments around each segment 
     ndensity = [len(i) for i in mycelia['share_e'][:num_total_segs]]
+    # The purpose of the code below is apparently to prevent segments from growing in high density regions
+    # But why? This is not clear.
+    # This is done by filtering out segments that have a number density per grid greater than a certain threshold
+    # But this is based on the grid size, not on the actual number of segments per volume
+    #
     # Find those segments that have greater than half of their grid filled by other segments
-    # But apply density filtering only after initial tips have segmented
+    # But apply density filtering only after initial tips (ie, tip 3) have segmented
     if 3 not in tip_idxs:
-        #fidx = np.where(ndensity < np.int_(3))
-        fidx = np.where(ndensity <= np.int64(params['dy']/params['hy_diam']*0.2))
+        fidx = np.where(ndensity < np.int64(2))
+        #fidx = np.where(ndensity <= np.int64(params['dy']/params['hy_diam']*0.2))
         # Don't allow segments in high density regions to grow
         tip_idxs = list(set(tip_idxs) & set(fidx[0]))
 
@@ -752,8 +757,8 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals,
     # Get the number density of segments around each segment 
     ndensity = [len(i) for i in mycelia['share_e'][:num_total_segs]]
     # Find those segments that have greater than half of their grid filled by other segments
-    fidx = np.where(ndensity > np.int64(params['sl']/params['hy_diam']*0.2))
-    #fidx = np.where(ndensity[4:] > np.int_(2))
+    #fidx = np.where(ndensity > np.int64(params['sl']/params['hy_diam']*0.2))
+    fidx = np.where(ndensity[4:] > np.int_(2))
     # Don't allow segments in high density regions to branch
     mycelia['can_branch'][fidx] = False
     use_original = 0

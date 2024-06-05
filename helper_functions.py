@@ -165,10 +165,18 @@ def get_configs(config_filename):
 
         'num_v' : nutrient_params.getfloat('num_v')
     }
+    # The rate of glucose uptake is determined from the amount of glucose needed to support the growth rate.
+    # The rate of uptake of glucose (kc1_gluc) is the product of the rate of radial growth (kg1_wall)
+    # times the cross sectinoal area of the hyphae, the hyphal density, the fraction of wet cell mass that is dry cell mass
+    # the fraction of dry cell mass that is cell wall material, the fraction of cell wall material that is composed of sugars (chitin and glucan),
+    # the fraction of glucose mass that is provided by metabolism for cell wall raw material (yield_c),
+    # and all divided by the formula weight of the chitin and glucan cell wall material.
+    # The factor of 1.0e+03 is to convert the rate from moles to millimoles.
     kc1_gluc = params_dict['kg1_wall']*params_dict['cross_area']*params_dict['hy_density']\
                 *params_dict['f_dw']*params_dict['f_wall']*params_dict['f_cw_cellwall'] \
                 /(params_dict['mw_cw']*params_dict['yield_c'])*1.0e+03
     params_dict['kc1_gluc'] = kc1_gluc
+    params_dict['ku1_gluc'] = kc1_gluc
 
     #if not('yield_c_in_mmoles' in params_dict):
     #	params_dict['yield_c_in_mmoles'] = params_dict['yield_c']*params_dict['mw_glucose']/params_dict['mw_cw']

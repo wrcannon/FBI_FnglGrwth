@@ -225,7 +225,7 @@ def driver_singleNutrient(run):
     #hf.plot_fungus(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
     #hf.plot_fungus_gluc(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
     #hf.plot_fungus_generic(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
-    restart = 0
+    restart = 1
     if (restart == 1):
             restart_file = "restart.pkl"
             file = open(restart_file,'rb')
@@ -250,14 +250,6 @@ def driver_singleNutrient(run):
         elif params['plot_units_time'] == 'seconds':
             plot_time = current_time
         print('Time: ', plot_time, params['plot_units_time'])
-
-
-        # if current_time > 0 and num_total_segs >= 20:
-        #     print('Simulation terminated due to maximal segment number limit reached.')
-        #     break
-            # breakpoint()
-        if current_time == 0:
-            print('branchingRate : ', params['branch_rate'])
         
         #Loop over updates for external diffusion and uptake by fungi    
         ntimes = np.floor(params['dt_i']/ params['dt_e'])
@@ -381,7 +373,7 @@ def driver_singleNutrient(run):
         #    grd_density = sf.grid_density(mycelia, sub_e_gluc, num_total_segs) 
         #    print('Max grid density = ', np.max(grd_density))
         
-        print_time = 4*3600*print_increment # print every 4 hours
+        print_time = 2*3600*print_increment # print every 4 hours
         # PLOT & SAVE DATA
         if (current_time > print_time):
             print_increment = print_increment+1        
