@@ -9,18 +9,33 @@ Created on Wed Oct 28 15:43:32 2020
 import numpy as np
 # import operator
 from scipy.linalg import solve_banded
-import helper_functions as hf
-import growth_functions as gf
-
-params, config = hf.get_configs('parameters.ini')
 
 
 # ----------------------------------------------------------------------------
 # EXTERNAL NUTRIENT FUNCTIONS
 # ----------------------------------------------------------------------------
 
+def michaelis_menten(k, K, s):
+    """
+    Parameters
+    ----------
+    k : double
+        Maximum rate achieved by the system, at saturating substrate concentration.
+    K : double
+        Michaelis constant.
+    s : double
+        Concentration of substrate/nutrient.
 
-def diffusion_ADI(sub_e, time_step):
+    Returns
+    -------
+    double
+        Reaction rate.
+
+    """
+
+    return (k * s) / (K + s)
+
+def diffusion_ADI(sub_e, time_step,params):
     
     """
     Parameters
@@ -110,7 +125,7 @@ def diffusion_ADI(sub_e, time_step):
     #     breakpoint()
     return sub_e_step2
 
-def diffusion_ADI_treha(sub_e, time_step):
+def diffusion_ADI_treha(sub_e, time_step, params):
     
     """
     Parameters
@@ -366,7 +381,7 @@ def distance_to_tip_new(mycelia, num_total_segs):
         return dtt
 # # ----------------------------------------------------------------------------
     
-def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
+def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
              isConvectDependOnMetabo_cw,
              isConvectDependOnMetabo_gluc,
              isConvectDependOnMetabo_treha):
@@ -392,7 +407,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
     materials)
     """
     #%% Set initial conditions and variables:
-    alpha_gluc = gf.michaelis_menten(1, 
+    alpha_gluc = michaelis_menten(1, 
                           params['Kc2_gluc'], 
                           mycelia['gluc_i'][:num_total_segs])
 
@@ -482,7 +497,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
             to_nbrs.append([])
 
         # Find the immediate neighbors that are further from tip.
-        # A hyphal segment will accept flow from these neighbors        
+        # A hyphal segment will accept flow/advection from these neighbors        
         if len(np.where(dtt[nbr_of_idx] > dtt[idx])[0]) and (mycelia['branch_id'][idx])>-1:
             chosen_idx = np.array(np.where(dtt[nbr_of_idx] > dtt[idx])[0])
             
@@ -624,7 +639,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
 
     #%% Metabolism:
     # Update concentrations due to metabolic activity:
-    alpha_gluc = gf.michaelis_menten(1, 
+    alpha_gluc = michaelis_menten(1, 
                           params['Kc2_gluc'], 
                           mycelia['gluc_i'][:num_total_segs])
     convert_term = params['kc1_gluc']*alpha_gluc
@@ -699,9 +714,9 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
     
     # These logistic functions (alpha_*) will be used to scale the velocity due to metabolic activity. 
     # They prevent more material being removed than is present in the segment:
-    alpha_cw = gf.michaelis_menten(1, K_cw, 
+    alpha_cw = michaelis_menten(1, K_cw, 
                                 mycelia['cw_i'][:num_total_segs])   
-    alpha_gluc2 = gf.michaelis_menten(1, K_gluc, 
+    alpha_gluc2 = michaelis_menten(1, K_gluc, 
                                 mycelia['gluc_i'][:num_total_segs])
 
     cw_transport_term = np.zeros((num_total_segs,1))
@@ -848,7 +863,7 @@ def transloc(mycelia, num_total_segs, dtt, isActiveTrans, whichInitialCondition,
 # UPTAKE FUNCTIONS
 # ----------------------------------------------------------------------------
     
-def uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd, time_step):
+def uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd, time_step,params):
     """
     Parameters
     ----------
@@ -881,14 +896,14 @@ def uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd, time_step
     #    breakpoint()
     
     # Amount in mmol taken up by each segment - That is, RATE IS NOT in CONCENTRATION/sec
-    # gluc_uptake = params['dt']*gluc_e*gf.michaelis_menten(params['ku1_gluc'], 
+    # gluc_uptake = params['dt']*gluc_e*michaelis_menten(params['ku1_gluc'], 
     #                                                       params['Ku2_gluc'], 
     #                                                       gluc_i)
     # Ku2_gluc units are concentration in mmole/(micron)^ in parameters.ini
     # but are changed to units of mmole in helper_functions.get_configs()
     # Since a hyphae is considered to live at a single grid point, the uptake 
     # of glucose in the hyphae is from the grid at which the center of the hyphae
-    #gluc_uptake = params['dt']*gf.michaelis_menten(params['ku1_gluc'], 
+    #gluc_uptake = params['dt']*michaelis_menten(params['ku1_gluc'], 
     #                                              params['Ku2_gluc'], 
     #                                              gluc_e)
     # Could use a different rate of uptake depending on the hyphal size,
@@ -900,7 +915,7 @@ def uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd, time_step
     uptake_idx = np.where(relative_seg_vol > 0)
     no_uptake_idx = np.where(relative_seg_vol <= 0)
     # Amount of glucose taken up by each segment
-    gluc_uptake[uptake_idx] = time_step*gf.michaelis_menten(params['ku1_gluc'], 
+    gluc_uptake[uptake_idx] = time_step*michaelis_menten(params['ku1_gluc'], 
                                                   params['Ku2_gluc']/relative_seg_vol[uptake_idx], 
                                                   gluc_e[uptake_idx])
 
@@ -956,7 +971,7 @@ def uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd, time_step
     mycelia['gluc_i'][:num_total_segs] += params['yield_u']*gluc_uptake.reshape(-1,1)
     return mycelia
 
-def release(sub_e_treha, mycelia, num_total_segs, isTipRelease):
+def release(sub_e_treha, mycelia, num_total_segs, isTipRelease, params):
     """
     Parameters
     ----------
@@ -990,7 +1005,7 @@ def release(sub_e_treha, mycelia, num_total_segs, isTipRelease):
     #     breakpoint()
     
     relative_seg_vol = mycelia['seg_vol'][:num_total_segs].flatten()/params['init_vol_seg']
-    #treha_release = gf.michaelis_menten(params['kc1_gluc'], 
+    #treha_release = michaelis_menten(params['kc1_gluc'], 
     #                      params['Kc2_gluc'], 
     #                      treha_i)*params['dt']
     #treha_release = (treha_i/mycelia['seg_vol']) / (1.0e-18 + treha_e/params['vol_grid'] )

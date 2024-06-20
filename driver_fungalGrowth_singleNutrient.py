@@ -29,6 +29,9 @@ import helper_functions as hf
 import growth_functions as gf
 import nutrient_functions2 as nf
 import setup_functions as sf
+# Load in parameters as a dictionary
+global params
+params, config = hf.get_configs('parameters.ini')
 
 # Define string constants
 left ='LEFT'
@@ -51,11 +54,12 @@ def driver_singleNutrient(run):
     # ----------------------------------------------------------------------------
     
     # Load in parameters as a dictionary
-    params, config = hf.get_configs('parameters.ini')
+    #params, config = hf.get_configs('parameters.ini')
     
     # Extract some commonly used parameters
     sl = params['sl']
     dt_i = params['dt_i']
+    branch_rate = params['branch_rate']
     
     ###########################################################################
     ###########################################################################
@@ -83,7 +87,7 @@ def driver_singleNutrient(run):
     
 
     # Is fungal fusion (anastomosis) active? 1 = YES, 0 = NO
-    fungal_fusion = 1
+    fungal_fusion = 0
     print('fungal_fusion : ', fungal_fusion)
     
     # Is chemoattractant released at the tip only? 1 = YES, 0 = NO
@@ -225,9 +229,9 @@ def driver_singleNutrient(run):
     #hf.plot_fungus(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
     #hf.plot_fungus_gluc(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
     #hf.plot_fungus_generic(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
-    restart = 1
+    restart = 0
     if (restart == 1):
-            restart_file = "restart.pkl"
+            restart_file = "restart_test.pkl"
             file = open(restart_file,'rb')
             mycelia = pickle.load(file)
             num_total_segs = pickle.load(file)
@@ -272,9 +276,9 @@ def driver_singleNutrient(run):
                 ##################################################################            
             
                 if (glucDiff != 0):
-                    sub_e_gluc = nf.diffusion_ADI(sub_e_gluc, params['dt_e'])
+                    sub_e_gluc = nf.diffusion_ADI(sub_e_gluc, params['dt_e'],params)
                 if (trehaDiff != 0):
-                    sub_e_treha = nf.diffusion_ADI_treha(sub_e_treha, params['dt_e'])
+                    sub_e_treha = nf.diffusion_ADI_treha(sub_e_treha, params['dt_e'],params)
                     # if np.min(sub_e_gluc)<1e-17:
                     #     breakpoint()
                     if np.min(sub_e_treha)<0:
@@ -292,21 +296,21 @@ def driver_singleNutrient(run):
         
             # UPTAKE
             tU_0 = time.time()
-            mycelia = nf.uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd, params['dt_e'])
+            mycelia = nf.uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd, params['dt_e'],params)
             # mycelia = nf.uptake(sub_e_gluc, sub_e_treha, mycelia, num_total_segs, var_nutrient_backgrnd)
             tU_1 = time.time()
             time_uptake += (tU_1 - tU_0)
         # end while
         
         # RELEASE
-        mycelia = nf.release(sub_e_treha, mycelia, num_total_segs, isTipRelease)
+        mycelia = nf.release(sub_e_treha, mycelia, num_total_segs, isTipRelease, params)
         if (np.isnan(np.sum(mycelia['cw_i'][:num_total_segs]))):
             breakpoint()
                
         # TRANSLOCATION
         tT_0 = time.time()
         
-        mycelia = nf.transloc(mycelia, num_total_segs, dtt, isActiveTrans,
+        mycelia = nf.transloc(mycelia, params, num_total_segs, dtt, isActiveTrans,
                               whichInitialCondition,
                               isConvectDependOnMetabo_cw,
                               isConvectDependOnMetabo_gluc,
@@ -324,10 +328,10 @@ def driver_singleNutrient(run):
         
         old_num_total_segs = num_total_segs
         # breakpoint()
-        mycelia, num_total_segs, dtt = gf.extension(mycelia, num_total_segs, 
+        mycelia, num_total_segs, dtt = gf.extension(mycelia, params, num_total_segs, 
                                         dtt, x_vals, y_vals,isCalibration, 
                                         dist2Tip_new, fungal_fusion,
-                                        chance_to_fuse)
+                                        chance_to_fuse, branch_rate)
         if(np.any(np.isnan(mycelia['cw_i'][:num_total_segs]))):
             breakpoint()
         
@@ -344,12 +348,17 @@ def driver_singleNutrient(run):
         tB_0 = time.time()
 
         old_num_total_segs = num_total_segs 
+        #adj_branch_rate = branch_rate/ntimes
+        #adj_branch_rate = branch_rate*(params['kg1_wall']/params['sl'])*ntimes#*params['dt_i']
+        n = (params['sl']/params['kg1_wall'])/params['dt_i']
+        adj_branch_rate = 1 - (branch_rate**(1/n))
+        adj_branch_rate = branch_rate
         if any(np.where(mycelia['can_branch'])[0]):
-            reached_max_branches, mycelia, num_total_segs, dtt = gf.branching(mycelia, 
+            reached_max_branches, mycelia, num_total_segs, dtt = gf.branching(mycelia, params, 
                                         num_total_segs, dtt, x_vals, y_vals, 
                                         isCalibration, dist2Tip_new, 
                                         fungal_fusion, restrictBranching,
-                                        chance_to_fuse)
+                                        chance_to_fuse, adj_branch_rate)
         if reached_max_branches == True:
             print ('Reached maximum number of branches:', np.max(mycelia['cw_i'])[0])
             breakpoint()
@@ -1133,8 +1142,6 @@ def driver_singleNutrient(run):
     
 ## Run Multiple iterations
 num_runs = 1
-# Load in parameters as a dictionary
-params, config = hf.get_configs('parameters.ini')
 folder_string, param_string = hf.get_filepath(params)
 
 # Create appropriate folder
