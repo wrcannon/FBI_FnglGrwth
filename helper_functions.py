@@ -199,6 +199,179 @@ def get_configs(config_filename):
 
     return params_dict, config
 
+def get_configs_new(config_filename):
+    """
+    Parameters
+    ----------
+    config_filename : str
+        Filepath for the .ini config file containing parameters.
+
+    Returns
+    -------
+    params_dict : dict
+        A dictionary containing all parameters in a usable form.
+    config : TYPE
+        The config file that was loaded into this function.
+
+    """
+    config = configparser.ConfigParser()
+    config.read(config_filename)
+    # breakpoint()
+    # Extract the sections
+    simulation_params = config['SIMULATION']
+    spatial_params = config['SPATIAL']
+    environment_params = config['ENVIRONMENT']
+    mycelia_params = config['MYCELIA']
+
+    # Generate extra values
+    diam =  discrete_params.getfloat('hy_diam')
+    sl =  discrete_params.getfloat('hy_compartment')
+    cross_area = np.pi*(0.5*diam)**2
+    init_vol_seg = sl*cross_area
+
+    dy = discrete_params.getfloat('grid_len')
+    # Best to have dy = 0.5*sl:
+    #dy = 0.5*sl
+    dz = discrete_params.getfloat('grid_height')
+    vol_grid = dy*dy*dz
+    diff_e_gluc = nutrient_params.getfloat('diffusion_e_gluc')
+    convert_metabolite = nutrient_params.getfloat('convert_metabolite')
+    diff_i_gluc = nutrient_params.getfloat('diffusion_i_gluc')
+    kg1_wall = nutrient_params.getfloat('kg1_wall')
+    hy_density =  growth_params.getfloat('hy_density')
+    f_dw = growth_params.getfloat('f_dw')
+    f_wall =  growth_params.getfloat('f_wall')
+    f_cw_cellwall =  growth_params.getfloat('f_cw_cellwall')
+    mw_cw = nutrient_params.getfloat('mw_cw')
+
+    # dt = 0.99*(dy**2)/(4*diff_e_gluc)
+    #dt = 0.75*min((sl**2/diff_i_gluc),(sl/kg1_wall)) # kg1_wall is radial growth rate and advection rate
+    
+    # The maximum rate of active transport is set to be the product of the maximum rate of radial growth, 
+    # the cross sectional area of the hyphae, the dry weight of the cell, the fraction of the dry weight that is cell wall material,
+    # and divided by the formula weight of the cell wall material,
+    active_trsprt_vel_cw = kg1_wall*cross_area*hy_density*1.0e+12*f_dw*f_wall*f_cw_cellwall \
+        /mw_cw
+    advection_constant_gluc = kg1_wall*init_vol_seg # kg1_wall is the radial rate. 
+                                                    # scaling it by the volume of the hyphae gives the rate that glucose
+                                                    # would spread in 2-dimensions per second.
+
+    #dt = 0.0025*min((sl**2/diff_i_gluc),(sl/kg1_wall)) #kg1_wall should be advection rate
+    dt_i = 0.01*min((sl**2/diff_i_gluc),1/(active_trsprt_vel_cw*0.02))
+    dt_e = 0.01*(dy**2/diff_e_gluc)
+    #dt = min(dt, dy**2/(diff_e_gluc))
+    #dt = 0.01*dt
+
+    #dt = 22.5
+    #dt = 0.5*0.75*min((sl**2/diff_i_gluc),(sl/linear_growth_rate))
+
+    up_state = nutrient_params['up_state']
+    if up_state == 'repressed':
+        #Ku2 = nutrient_params.getfloat('Ku2a_gluc')*init_vol_seg
+        Ku2 = nutrient_params.getfloat('Ku2a_gluc')*vol_grid
+
+    else:
+        #Ku2 = nutrient_params.getfloat('Ku2b_gluc')*init_vol_seg
+        Ku2 = nutrient_params.getfloat('Ku2b_gluc')*vol_grid
+
+    # Save to a dictionary
+    params_dict = {
+        # SECTION 1: Discretization Parameters
+        'dt_i' : dt_i,
+        'dt_e' : dt_e,
+        'final_time' : discrete_params.getfloat('final_time'),
+        'plot_units_time' : discrete_params['plot_units_time'],
+
+        'sl' : sl,
+        'dy' : dy,
+        'vol_grid': vol_grid,
+        'plot_units_space' : discrete_params['plot_units_space'],
+        'init_segs_count' : discrete_params.getint('init_segs_count'),
+        'environ_type' : discrete_params['environ_type'],
+        'cross_area' : cross_area,
+        'init_vol_seg' : init_vol_seg,
+        'septa_len' : 1,
+        'grid_scale_val' : discrete_params.getfloat('grid_scale_val'),
+        'hy_diam' : discrete_params.getfloat('hy_diam'),
+
+        # SECTION 2: Extension & Branching for Growth Parameters
+        'angle_sd' : growth_params.getfloat('angle_sd')*(np.pi/180),
+        'branch_mean' : growth_params.getfloat('branch_mean')*(np.pi/180),
+        'branch_sd' : growth_params.getfloat('branch_sd')*(np.pi/180),
+        'branch_cost' : growth_params.getfloat('branch_cost'),
+        'branch_rate' : growth_params.getfloat('branch_rate'),
+        'hy_density' :  growth_params.getfloat('hy_density'),
+        'f_dw' :  growth_params.getfloat('f_dw'),
+        'f_wall' :  growth_params.getfloat('f_wall'),
+        'f_cw_cellwall' :  growth_params.getfloat('f_cw_cellwall'),
+
+        # SECTION 3: Internal & External Nutrient Parameters
+        'init_sub_e_dist' : nutrient_params['init_sub_e_dist'],
+        'init_sub_e_gluc' : nutrient_params.getfloat('init_sub_e_gluc')*vol_grid,
+        'init_sub_e_treha' : nutrient_params.getfloat('init_sub_e_treha')*vol_grid,
+        'diffusion_e_gluc' : diff_e_gluc,
+        'convert_metabolite': convert_metabolite,
+
+        'init_sub_i_gluc' : nutrient_params.getfloat('init_sub_i_gluc'),
+        'diffusion_i_gluc' : nutrient_params.getfloat('diffusion_i_gluc'),
+        'vel_gluc' : nutrient_params.getfloat('vel_gluc'),
+        
+        # 'm_gluc' : nutrient_params.getfloat('m_gluc'),
+        # 'rho' : nutrient_params.getfloat('rho')*vol_seg,
+
+        'ku1_gluc' : nutrient_params.getfloat('ku1_gluc'),
+        'Ku2_gluc' : Ku2,
+        'yield_u' : nutrient_params.getfloat('yield_u'),
+
+        #'kc1_gluc' : nutrient_params.getfloat('kc1_gluc'),
+        #'Kc2_gluc' : nutrient_params.getfloat('Kc2_gluc'),
+        'kc1_gluc' : nutrient_params.getfloat('ku1_gluc'),
+        'Kc2_gluc' : Ku2*init_vol_seg/vol_grid,
+        'yield_c' : nutrient_params.getfloat('yield_c'),
+
+        'kg1_wall' : nutrient_params.getfloat('kg1_wall'),
+        # 'Kg2_wall' : nutrient_params.getfloat('Kg2_wall')*vol_seg,
+        'Kg2_wall' : nutrient_params.getfloat('Kg2_wall'),
+        'mw_cw' : nutrient_params.getfloat('mw_cw'),
+        'mw_glucose' : nutrient_params.getfloat('mw_glucose'),
+        'active_trsprt_vel_cw' : active_trsprt_vel_cw,
+
+        'num_v' : nutrient_params.getfloat('num_v')
+    }
+    # The rate of glucose uptake is determined from the amount of glucose needed to support the growth rate.
+    # The rate of uptake of glucose (kc1_gluc) is the product of the rate of radial growth (kg1_wall)
+    # times the cross sectinoal area of the hyphae, the hyphal density, the fraction of wet cell mass that is dry cell mass
+    # the fraction of dry cell mass that is cell wall material, the fraction of cell wall material that is composed of sugars (chitin and glucan),
+    # the fraction of glucose mass that is provided by metabolism for cell wall raw material (yield_c),
+    # and all divided by the formula weight of the chitin and glucan cell wall material.
+    # The factor of 1.0e+03 is to convert the rate from moles to millimoles.
+    kc1_gluc = params_dict['kg1_wall']*params_dict['cross_area']*params_dict['hy_density']\
+                *params_dict['f_dw']*params_dict['f_wall']*params_dict['f_cw_cellwall'] \
+                /(params_dict['mw_cw']*params_dict['yield_c'])*1.0e+03
+    params_dict['kc1_gluc'] = kc1_gluc
+    params_dict['ku1_gluc'] = kc1_gluc
+
+    #if not('yield_c_in_mmoles' in params_dict):
+    #	params_dict['yield_c_in_mmoles'] = params_dict['yield_c']*params_dict['mw_glucose']/params_dict['mw_cw']
+    params_dict['yield_c_in_mmoles'] = params_dict['yield_c']*params_dict['mw_glucose']/params_dict['mw_cw']
+    
+    use_original = 0
+
+    if(use_original != 1):
+        # Max rate of moles of cell wall raw material used per time step:
+        max_gms_cw_per_time = params_dict['kg1_wall']* np.pi*(params_dict['hy_diam']/2.0)**2.0 \
+                        * params_dict['hy_density'] * params_dict['f_dw']* params_dict['f_wall'] * params_dict['f_cw_cellwall']
+        max_moles_cw_per_time = max_gms_cw_per_time / params_dict['mw_cw']
+
+        #Max rate of conversion of glucose to cell wall material is the maxrate of
+        # grams of cell wall used per step/timestep / (gms cw produced per gms glucose used)/ (MW glucose)
+        params_dict['yield_in_moles'] = params_dict['yield_c']*params_dict['mw_glucose']/params_dict['mw_cw']
+        #params_dict['kc1_gluc'] =  max_moles_cw_per_time/yield_in_moles
+        #params_dict['ku1_gluc'] = params_dict['kc1_gluc']
+
+
+    return params_dict, config
+
 # ----------------------------------------------------------------------------
 
 def get_filepath(params):
@@ -228,7 +401,7 @@ def get_filepath(params):
     #folder_string = "noFusion_tipRel_homogenousEnv_convert"
     #folder_string = "NoFusion_NoTipRel_homogenousEnv_initGluc20mm_branch0_3_brCost1x_seg=400"
     folder_string = "NoFusion_NoTipRel_homogenousEnv_initGluc20mm_branch0_3_brCost1x_t1"
-    folder_string = "test2"
+    folder_string = "test_Bill_branch3"
     # file_string = "{}_b={:.3e}_ieg={}_deg={}_iig={:.3e}_dig={}_vw={}_kyu={},{:.3e},{}_kyc={:.3e},{:.3e},{}_kyg={},{:.3e},{}".format(
     #     folder_string,
     #     params['branch_rate'],
@@ -242,7 +415,7 @@ def get_filepath(params):
     #file_string = "NoFusion_tipRel_patch3Env_initGluc2um_branch0_3_brCost1x_t1"
     file_string = "NoFusion_AllHyphRelease_homogenousEnv_initGluc20mm_branch0_3_brCost1x_50x50x0.20umGrid"
     #file_string = "Fusion_AllHyphRelease_patchyEnv_initGluc20mm_branch0_3_brCost1x_200x200x0.20umRandomGrid"
-    file_string = "test2"
+    file_string = "test_Bill_branch3"
 
     return folder_string, file_string
 

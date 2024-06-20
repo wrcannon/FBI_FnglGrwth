@@ -8,7 +8,8 @@ Created on Wed Oct 28 15:21:05 2020
 
 import numpy as np
 import helper_functions as hf
-import nutrient_functions as nf
+import nutrient_functions2 as nf
+import random
 
 params, config = hf.get_configs('parameters.ini')
 
@@ -393,7 +394,7 @@ def update_structure(mycelia, idxs, grow_len, cost_grow_gluc, cost_grow_cw, isCa
 #     return mycelia
 
 
-def septa_formation(mycelia, num_total_segs):
+def septa_formation(mycelia, num_total_segs,branch_rate):
     """
     Parameters
     ----------
@@ -453,7 +454,12 @@ def septa_formation(mycelia, num_total_segs):
             mycelia['septa_loc'][segs_on_branch[new_septa]] = True
 
             # Allow the segment behind it to branch
-            mycelia['can_branch'][segs_on_branch[new_septa-1]] = True
+            total_nchoices = segs_on_branch[new_septa-1]
+            rand_values = np.random.rand(total_nchoices)
+            rand_values = np.random.rand(1)
+            is_true = (rand_values < branch_rate)
+            mycelia['can_branch'][segs_on_branch[new_septa-1]] = is_true
+            #mycelia['can_branch'][segs_on_branch[new_septa-1]] = True
             
             # print('mycelia[dist_to_septa][septa_need] : ' , mycelia['dist_to_septa'][septa_need])
             
@@ -476,7 +482,12 @@ def septa_formation(mycelia, num_total_segs):
                 mycelia['septa_loc'][segs_on_branch[params['septa_len']]] = True
     
                 # Allow the segment behind it to branch
-                mycelia['can_branch'][segs_on_branch[params['septa_len']-1]] = True
+                total_nchoices = len([segs_on_branch[params['septa_len']-1]])
+                rand_values = np.random.rand(total_nchoices)
+                rand_values = np.random.rand(1)
+                is_true = (rand_values < branch_rate)
+                mycelia['can_branch'][segs_on_branch[params['septa_len']-1]] = is_true
+                #mycelia['can_branch'][segs_on_branch[params['septa_len']-1]] = True
                 # if any(mycelia['dist_to_septa'][septa_need] - params['sl']*params['septa_len'] < 2*params['sl']*params['septa_len']):
                 #     breakpoint()
                 # print('mycelia[dist_to_septa][septa_need] : ' , mycelia['dist_to_septa'][septa_need])
@@ -615,9 +626,9 @@ def split_segment(mycelia, num_total_segs, x_vals, y_vals, isCalibration, dist2T
 # ----------------------------------------------------------------------------
 
 # Extension - Main function for elongation
-def extension(mycelia, num_total_segs, dtt, x_vals, y_vals, 
+def extension(mycelia, params, num_total_segs, dtt, x_vals, y_vals, 
               isCalibration, dist2Tip_new, fungal_fusion,
-              chance_to_fuse):
+              chance_to_fuse,branch_rate):
     """
     Parameters
     ----------
@@ -658,10 +669,14 @@ def extension(mycelia, num_total_segs, dtt, x_vals, y_vals,
     # Find those segments that have greater than half of their grid filled by other segments
     # But apply density filtering only after initial tips (ie, tip 3) have segmented
     if 3 not in tip_idxs:
-        fidx = np.where(ndensity < np.int64(2))
-        #fidx = np.where(ndensity <= np.int64(params['dy']/params['hy_diam']*0.2))
+        fidx = np.where(ndensity < np.int64(2)) # This is too sparse if the grid is large
+        #fidx = np.where(ndensity <= np.int64(params['dy']/params['hy_diam']*0.2)) 
+        #grid_area = (params['grid_len']*params['grid_len']*params['grid_height'])
+        #scale = 1.0e06/grid_area # convert from square microns to square millimeters
+        #scaled_density = ndensity*scale
+        #fidx = np.where(scaled_density >= params['max_hyphal_density'])
         # Don't allow segments in high density regions to grow
-        tip_idxs = list(set(tip_idxs) & set(fidx[0]))
+        #tip_idxs = list(set(tip_idxs) & set(fidx[0]))
 
     # Check to see if the list is empty, and if so, return
     if not tip_idxs:
@@ -707,7 +722,7 @@ def extension(mycelia, num_total_segs, dtt, x_vals, y_vals,
         nn = 3
         #if max(mycelia['dist_to_septa']) > 3*params['sl']*params['septa_len']:
         if max(mycelia['dist_to_septa']) > nn*params['sl']*params['septa_len']:
-            mycelia = septa_formation(mycelia, num_total_segs)
+            mycelia = septa_formation(mycelia, num_total_segs, branch_rate)
             # print('Septa formation from 3x length')
         # if(np.any(np.isnan(mycelia['cw_i']))):
         #     breakpoint()
@@ -722,9 +737,9 @@ def extension(mycelia, num_total_segs, dtt, x_vals, y_vals,
 # ----------------------------------------------------------------------------
 
 # Branching - Main function for new branches
-def branching(mycelia, num_total_segs, dtt, x_vals, y_vals, 
+def branching(mycelia, params, num_total_segs, dtt, x_vals, y_vals, 
               isCalibration, dist2Tip_new, fungal_fusion, restrictBranching,
-              chance_to_fuse):
+              chance_to_fuse, branch_rate=1.0):
     """
     Parameters
     ----------
@@ -760,7 +775,8 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals,
     #fidx = np.where(ndensity > np.int64(params['sl']/params['hy_diam']*0.2))
     fidx = np.where(ndensity[4:] > np.int_(2))
     # Don't allow segments in high density regions to branch
-    mycelia['can_branch'][fidx] = False
+    # mycelia['can_branch'][fidx] = False
+    
     use_original = 0
     if (restrictBranching == 0):
         potential_branch_idxs = (np.where(mycelia['can_branch'])[0])
@@ -771,6 +787,12 @@ def branching(mycelia, num_total_segs, dtt, x_vals, y_vals,
         potential_branch_idxs = (tmp_potential_branch_idxs[restricting])
         # if np.max(num_total_segs > 8):
         #     breakpoint()
+    
+    # Reduce the number of branches by the branch rate
+    fidx_range = np.arange(1,len(potential_branch_idxs),1, dtype=int)
+    adjusted_branch_rate = branch_rate*(params['kg1_wall']/params['sl'])
+    fidx = random.choices(fidx_range, k=np.int_(len(potential_branch_idxs)*branch_rate))
+    #potential_branch_idxs = potential_branch_idxs[fidx]
 
     if not np.any(potential_branch_idxs):
         return reached_max_branches, mycelia, num_total_segs, dtt
