@@ -18,6 +18,7 @@ from joblib import Parallel, delayed
 import multiprocessing
 import matplotlib.pyplot as plt
 import seaborn as sns
+import argparse
 
 num_cores = multiprocessing.cpu_count()
 
@@ -31,8 +32,20 @@ import nutrient_functions2 as nf
 import setup_functions as sf
 # Load in parameters as a dictionary
 global params
-params, config = hf.get_configs('parameters.ini')
 
+msg = "Adding description"
+# Initialize parser
+parser = argparse.ArgumentParser(description = msg)
+parser.add_argument("-i", "--Input", help = "Show Input")
+# Read arguments from command line
+args = parser.parse_args()
+print(args.Input)
+try:
+    # Load in parameters as a dictionary
+    params, config = hf.get_configs(args.Input)
+except:
+    print('failed to load parameters from command line')
+    params, config = hf.get_configs('parameters.ini')
 # Define string constants
 left ='LEFT'
 right = 'RIGHT'
@@ -75,7 +88,9 @@ def driver_singleNutrient(run):
     print('dist2Tip_new : ', dist2Tip_new)
     
     # Is the background environment diffusion-capable? 1 = YES, 0 = NO
-    backDiff = 1
+    try: 
+        backDiff = params['diffusion_on']
+    except: backDiff = 1
     print('backDiff : ', backDiff)
 
     # Is the nutrient background variable or fixed?
@@ -87,11 +102,15 @@ def driver_singleNutrient(run):
     
 
     # Is fungal fusion (anastomosis) active? 1 = YES, 0 = NO
-    fungal_fusion = 0
+    try: #(params['fungal_fusion'])
+        fungal_fusion = params['fungal_fusion']
+    except NameError: fungal_fusion = 0
     print('fungal_fusion : ', fungal_fusion)
     
     # Is chemoattractant released at the tip only? 1 = YES, 0 = NO
-    isTipRelease = 0
+    try: #(params['isTipRelease'])
+        isTipRelease = params['isTipRelease']
+    except NameError: isTipRelease = 0
     print('isTipRelease : ', isTipRelease)
     
     # Is the initial condition a line or a cross? 1 = Line, 0 = Cross
@@ -110,20 +129,28 @@ def driver_singleNutrient(run):
     # Why N = 2 would be the minimum? Because in the current setup, a segment
     # directly behind the tip is not enclosed by two septa hence not eligible
     # for branching.
-    restrictBranching = 3
+    try:
+        restrictBranching = params['restrictBranching']
+    except NameError: restrictBranching = 3
     print('restrictBranching : ', restrictBranching)
     
     # Is the initial background environment with 'patchy' nutrient distribution?
     # 1 = YES, 0 = NO
-    isPatchyExtEnvironment = 0
+    try: 
+        isPatchyExtEnvironment = params['is_pathchyEnv']
+    except NameError: isPatchyExtEnvironment = 0
     print('isPatchyExtEnvironment : ', isPatchyExtEnvironment)
+    
     if (isPatchyExtEnvironment == 1):
         ## There are currently 5 presets of the non-homogeneous randomized
         ## nutrient distribution. setBackground = 1,2,3,4,or 5 will determine 
         ## the set to use.
         ## setBackground = 1,2,3 have 50 nutrient foci
         ## setBackground = 4,5 have 100 nutrient foci
-        setBackground = 0
+        try: 
+            setBackground = params['setPatchyEnv']
+        except NameError: setBackground = 3
+        print('Patchy Background : ', setBackground)
     
     # Is the cell wall convection (active transport) scaled by local metabolism 
     # activity? 1 = YES, 0 = NO
@@ -141,7 +168,9 @@ def driver_singleNutrient(run):
     print('isConvectDependOnMetabo_treha : ', isConvectDependOnMetabo_treha)
     
     # What is the probability for fusion to be established?
-    chance_to_fuse = 0.25
+    try: 
+        chance_to_fuse = params['chance_to_fuse']
+    except NameError: chance_to_fuse = 0.25
     print('The probability for fungal fusion is set to : ', chance_to_fuse)
     
     ###########################################################################
@@ -229,9 +258,13 @@ def driver_singleNutrient(run):
     #hf.plot_fungus(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
     #hf.plot_fungus_gluc(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
     #hf.plot_fungus_generic(mycelia, num_total_segs, current_time, folder_string, param_string, params, run)
-    restart = 0
+    try: 
+        restart = params['restart']
+    except NameError: restart = 0
     if (restart == 1):
-            restart_file = "restart_test.pkl"
+            try:
+                restart_file = params['restart_file']
+            except NameError: restart_file = "restart_test.pkl"
             file = open(restart_file,'rb')
             mycelia = pickle.load(file)
             num_total_segs = pickle.load(file)
@@ -1141,7 +1174,9 @@ def driver_singleNutrient(run):
 
     
 ## Run Multiple iterations
-num_runs = 1
+try:
+    num_runs = params['num_parallel_runs']
+except NameError: num_runs = 1
 folder_string, param_string = hf.get_filepath(params)
 
 # Create appropriate folder
