@@ -120,6 +120,19 @@ def get_configs(config_filename):
         'septa_len' : 1,
         'grid_scale_val' : discrete_params.getfloat('grid_scale_val'),
         'hy_diam' : discrete_params.getfloat('hy_diam'),
+        'fungal_fusion' : discrete_params.getint('fungal_fusion'),
+        'isTipRelease' : discrete_params.getint('isTipRelease'),
+        'restrictBranching' : discrete_params.getint('restrictBranching'),
+        'chance_to_fuse' : discrete_params.getfloat('chance_to_fuse'),
+        'is_pathchyEnv' : discrete_params.getint('is_pathchyEnv'),
+        'diffusion_on' : discrete_params.getint('diffusion_on'),
+        'num_parallel_runs' : discrete_params.getint('num_parallel_runs'),
+        'output_path' : discrete_params['output_path'],
+        'restart' : discrete_params.getint('restart'),
+        'restart_file' : discrete_params['restart_file'],
+        'setPatchyEnv' : discrete_params.getint('setPatchyEnv'),
+
+
 
         # SECTION 2: Extension & Branching for Growth Parameters
         'angle_sd' : growth_params.getfloat('angle_sd')*(np.pi/180),
@@ -400,8 +413,11 @@ def get_filepath(params):
     # folder_string = 'recalibration_02242022'
     #folder_string = "noFusion_tipRel_homogenousEnv_convert"
     #folder_string = "NoFusion_NoTipRel_homogenousEnv_initGluc20mm_branch0_3_brCost1x_seg=400"
-    folder_string = "NoFusion_NoTipRel_homogenousEnv_initGluc20mm_branch0_3_brCost1x_t1"
-    folder_string = "test_Bill_branch3"
+    try:
+        folder_string = params['output_path']
+    except NameError:
+        #folder_string = "NoFusion_NoTipRel_homogenousEnv_initGluc20mm_branch0_3_brCost1x_t1"
+        folder_string = "test_Bill_branch3"
     # file_string = "{}_b={:.3e}_ieg={}_deg={}_iig={:.3e}_dig={}_vw={}_kyu={},{:.3e},{}_kyc={:.3e},{:.3e},{}_kyg={},{:.3e},{}".format(
     #     folder_string,
     #     params['branch_rate'],
@@ -415,8 +431,12 @@ def get_filepath(params):
     #file_string = "NoFusion_tipRel_patch3Env_initGluc2um_branch0_3_brCost1x_t1"
     file_string = "NoFusion_AllHyphRelease_homogenousEnv_initGluc20mm_branch0_3_brCost1x_50x50x0.20umGrid"
     #file_string = "Fusion_AllHyphRelease_patchyEnv_initGluc20mm_branch0_3_brCost1x_200x200x0.20umRandomGrid"
-    file_string = "test_Bill_branch3"
-
+    try:
+        file_string = params['output_path']
+    except NameError:
+        #folder_string = "NoFusion_NoTipRel_homogenousEnv_initGluc20mm_branch0_3_brCost1x_t1"
+        file_string = "test_Bill_branch3"
+    
     return folder_string, file_string
 
 

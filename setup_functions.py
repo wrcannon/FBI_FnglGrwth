@@ -516,7 +516,7 @@ def external_grid_patchy(set,seed=6):
     #M = np.int_(round(M*(ngrids-1)/(240*240)*params['dy']/20))
     
     for i in range(len(r1)):
-        print(i)
+        #print(i)
         center_x = r1[i]
         center_y = np.flip(r2[i])
         for j in range(M):
