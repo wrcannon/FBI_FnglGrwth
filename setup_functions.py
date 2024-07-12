@@ -9,7 +9,7 @@ Created on Fri Jul  9 10:43:39 2021
 
 import numpy as np
 import helper_functions as hf
-import nutrient_functions as nf
+import nutrient_functions2 as nf
 import growth_functions as gf
 import math 
 

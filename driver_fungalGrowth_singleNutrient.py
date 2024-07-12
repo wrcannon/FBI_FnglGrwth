@@ -23,8 +23,8 @@ import argparse
 num_cores = multiprocessing.cpu_count()
 
 # cwd_path ='/Users/libra/Desktop/FBI_FungalGrowth-Bill1'
-cwd_path ='/Users/d3k137/docs/projects/boltzmann/code/06212017/run/fungal_growth/FBI_FungalGrowth2'
-os.chdir(cwd_path)
+#cwd_path ='/Users/d3k137/docs/projects/boltzmann/code/06212017/run/fungal_growth/FBI_FungalGrowth2'
+# os.chdir(cwd_path)
 
 import helper_functions as hf
 import growth_functions as gf
@@ -186,7 +186,13 @@ def driver_singleNutrient(run):
     else:
         x_vals, y_vals, sub_e_gluc, sub_e_treha = sf.external_grid_patchy(setBackground, run+1)
     
-    thisfile = open('grid_coordinates_temp.txt','w')
+    folder_string, param_string = hf.get_filepath(params)
+    # Create appropriate folder
+    if not os.path.exists('Results/{}/Run{}'.format(param_string, run)):
+        os.makedirs('Results/{}/Run{}'.format(param_string, run))
+
+    grid_file = "Results/{}/Run{}/grid_coordinates_temp.txt".format(param_string, run)
+    thisfile = open(grid_file,'w')
     for i in range(np.shape(x_vals)[0]): 
         print(x_vals[i],y_vals[i],file=thisfile)
     thisfile.close()
@@ -218,6 +224,9 @@ def driver_singleNutrient(run):
     count_branches = []
     count_tips = []
     count_radii = []
+    count_max_radii = []
+    count_avg_radii = []
+    count_rms_radii = []
     count_times = []
     count_biomass = []
     total_length_progression = []
@@ -262,10 +271,17 @@ def driver_singleNutrient(run):
         restart = params['restart']
     except NameError: restart = 0
     if (restart == 1):
+            restart_file = "Results/{}/Run{}/restart.pkl".format(param_string, run)
+    elif (restart == 2):
             try:
                 restart_file = params['restart_file']
             except NameError: restart_file = "restart_test.pkl"
-            file = open(restart_file,'rb')
+    if (restart > 0):
+            try:
+                file = open(restart_file,'rb')
+            except: 
+                print('No restart file found:', restart_file)   
+            
             mycelia = pickle.load(file)
             num_total_segs = pickle.load(file)
             dtt = pickle.load(file)
@@ -472,7 +488,10 @@ def driver_singleNutrient(run):
             
             count_branches.append(max(mycelia['branch_id'])[0]+1)
             count_tips.append(np.count_nonzero(mycelia['is_tip']))
-            count_radii.append(max(np.sqrt(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2)))
+            count_max_radii.append(max(np.sqrt(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2)))
+            count_avg_radii.append(np.mean(np.sqrt(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2)))
+            count_rms_radii.append(np.sqrt(np.mean(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2)))
+            
             count_times.append(current_time)
             total_biomass = np.sum(mycelia['seg_length'])*params['cross_area']*params['hy_density']
             count_biomass.append(total_biomass)
@@ -772,6 +791,7 @@ def driver_singleNutrient(run):
             num_segs = num_total_segs
             num_tips = np.count_nonzero(mycelia['is_tip'])
             max_radii = max(np.sqrt(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2))
+            avg_radii = np.mean(np.sqrt(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2))
             time_total = t_1 - t_0
             time_mins, time_secs = divmod(time_total, 60)
             min_seg_length_nonTipIdx = (np.where(mycelia['is_tip'][:num_total_segs] == False))[0]
@@ -805,10 +825,14 @@ def driver_singleNutrient(run):
                 'total_run_time': t_1-t_0,
                 'array_times' : count_times,
                 'total_biomass' : count_biomass,
+                'max_radii' : count_max_radii,
+                'avg_radii' : count_avg_radii,
+                'rms_radii' : count_rms_radii,
                 'array_num_branches' : count_branches,
                 'array_num_tips' : count_tips,
                 'array_branching_density' : np.array(count_branches)/count_tips,
                 'array_radii' : count_radii,
+                'array_avg_radii' : count_avg_radii,
                 'num_segments_at_end' : num_segs,
                 'max_seg_length' : max_seg_length,
                 'min_seg_length_nonTip' : min_seg_length,
@@ -1049,6 +1073,8 @@ def driver_singleNutrient(run):
     num_segs = num_total_segs
     num_tips = np.count_nonzero(mycelia['is_tip'])
     max_radii = max(np.sqrt(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2))
+    avg_radii = np.mean(np.sqrt(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2))
+    rms_radii = np.sqrt(np.mean(np.sqrt(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2)**2))
     time_total = t_1 - t_0
     time_mins, time_secs = divmod(time_total, 60)
     min_seg_length_nonTipIdx = (np.where(mycelia['is_tip'][:num_total_segs] == False))[0]
@@ -1062,7 +1088,9 @@ def driver_singleNutrient(run):
     
     count_branches.append(num_branches)
     count_tips.append(num_tips)
-    count_radii.append(max_radii)
+    count_max_radii.append(max_radii)
+    count_avg_radii.append(avg_radii)
+    count_rms_radii.append(rms_radii)
     count_times.append(current_time)
     count_biomass.append(total_biomass)
     
@@ -1104,6 +1132,7 @@ def driver_singleNutrient(run):
     print('  Num. Branches / Num. Tips:               {:.3f}'.format(num_branches/num_tips))
     print('  Number of Segments at End of Simulation: {}'.format(num_segs))
     print('  Radius at End of Simulation:        {:.4f}'.format(max_radii))
+    print('  Average Radius at End of Simulation:        {:.4f}'.format(avg_radii))
     print('-----------------------------------------------------------')
     print('TIME:')
     print('  External Update:      {:.4f}'.format(time_external))
@@ -1126,6 +1155,9 @@ def driver_singleNutrient(run):
         'total_run_time': t_1-t_0,
         'array_times' : count_times,
         'total_biomass' : count_biomass,
+        'max_radii' : count_max_radii,
+        'avg_radii' : count_avg_radii,
+        'rms_radii' : count_rms_radii,
         'array_num_branches' : count_branches,
         'array_num_tips' : count_tips,
         'array_branching_density' : count_branches/count_tips,

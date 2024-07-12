@@ -9,10 +9,12 @@ Created on Tue Sep 15 17:17:45 2020
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib import collections, colors, transforms
+plt.switch_backend('agg')
+#from matplotlib import collections, colors, transforms, 
 import seaborn as sns
 import sys
-import pylab as pl
+from matplotlib import pyplot as plt
+# import pylab as pl
 from matplotlib import collections  as mc
 sns.set_style('white')
 # sns.set_context("talk")
@@ -516,7 +518,7 @@ def plot_fungus(mycelia, num_total_segs, curr_time, folder_string, param_string,
         segments_xyz_concs.append((xi1, yi1, xi2, yi2, concsi[0]))
 
     # Generated plot
-    fig, ax = pl.subplots(dpi=600)
+    fig, ax = plt.subplots(dpi=600)
 
     top = cm.get_cmap('Oranges_r', 128) # r means reversed version
     bottom = cm.get_cmap('Blues', 128)# combine it all
@@ -636,7 +638,7 @@ def plot_fungus_gluc(mycelia, num_total_segs, curr_time, folder_string, param_st
         segments.append([(xi1, yi1), (xi2, yi2)])
 
     # Generated plot
-    fig, ax = pl.subplots(dpi=600)
+    fig, ax = plt.subplots(dpi=600)
 
     top = cm.get_cmap('Oranges_r', 128) # r means reversed version
     bottom = cm.get_cmap('Blues', 128)# combine it all
@@ -733,7 +735,7 @@ def plot_fungus_generic(mycelia, num_total_segs, curr_time, folder_string, param
         segments.append([(xi1, yi1), (xi2, yi2)])
 
     # Generated plot
-    fig, ax = pl.subplots(dpi=600)
+    fig, ax = plt.subplots(dpi=600)
 
     top = cm.get_cmap('Oranges_r', 128) # r means reversed version
     bottom = cm.get_cmap('Blues', 128)# combine it all
@@ -836,7 +838,7 @@ def plot_fungus_treha(mycelia, num_total_segs, curr_time, folder_string, param_s
         segments.append([(xi1, yi1), (xi2, yi2)])
 
     # Generated plot
-    fig, ax = pl.subplots(dpi=600)
+    fig, ax = plt.subplots(dpi=600)
 
     top = cm.get_cmap('Oranges_r', 128) # r means reversed version
     bottom = cm.get_cmap('Blues', 128)# combine it all

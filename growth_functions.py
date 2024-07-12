@@ -789,9 +789,9 @@ def branching(mycelia, params, num_total_segs, dtt, x_vals, y_vals,
         #     breakpoint()
     
     # Reduce the number of branches by the branch rate
-    fidx_range = np.arange(1,len(potential_branch_idxs),1, dtype=int)
-    adjusted_branch_rate = branch_rate*(params['kg1_wall']/params['sl'])
-    fidx = random.choices(fidx_range, k=np.int_(len(potential_branch_idxs)*branch_rate))
+    #fidx_range = np.arange(1,len(potential_branch_idxs),1, dtype=int)
+    #adjusted_branch_rate = branch_rate*(params['kg1_wall']/params['sl'])
+    #fidx = random.choices(fidx_range, k=np.int_(len(potential_branch_idxs)*branch_rate))
     #potential_branch_idxs = potential_branch_idxs[fidx]
 
     if not np.any(potential_branch_idxs):
