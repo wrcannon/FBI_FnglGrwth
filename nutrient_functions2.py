@@ -245,7 +245,9 @@ def distance_to_tip(mycelia, num_total_segs):
     non_null_segs = np.where(mycelia['branch_id'][:num_total_segs] > -1)[0]
     null_segs = np.where(mycelia['branch_id'][:num_total_segs] == -1)[0]
     if any(i in null_segs for i in non_null_segs):
-        breakpoint()
+        print('any null segs in non_null_segs')
+        print('Error in nutrient_functions2.py')
+       #breakpoint()
     # If a segment is a tip, it has a distance to tip of 0
     tip_segs = np.where(mycelia['is_tip'][:num_total_segs])[0]
     dtt[tip_segs] = 0
@@ -255,6 +257,8 @@ def distance_to_tip(mycelia, num_total_segs):
     # If a segment is a neighbor of a segment with dtt of i, it has a dtt of i+1
     current_dist = 1
     while min(dtt[non_null_segs]) < 0:
+        print('min(dtt[non_null_segs]) = ', min(dtt[non_null_segs]))
+        print('Error in nutrient_functions2.py')
         #breakpoint()
         # print('current_dist = ', current_dist)
         # Loop through all segments
@@ -303,7 +307,9 @@ def distance_to_tip_new(mycelia, num_total_segs):
         non_null_segs = np.where(mycelia['branch_id'][:num_total_segs] > -1)[0]
         null_segs = np.where(mycelia['branch_id'][:num_total_segs] == -1)[0]
         if any(i in null_segs for i in non_null_segs):
-            breakpoint()
+           #breakpoint()
+           print('any null segs in non_null_segs')
+           print('Error in nutrient_functions2.py')
         # If a segment is a tip, it has a distance to tip of 0
         tip_segs = np.where(mycelia['is_tip'][:num_total_segs])[0]
         dtt[tip_segs] = 0
@@ -342,7 +348,9 @@ def distance_to_tip_new(mycelia, num_total_segs):
         non_null_segs = np.where(mycelia['branch_id'][:num_total_segs] > -1)[0]
         null_segs = np.where(mycelia['branch_id'][:num_total_segs] == -1)[0]
         if any(i in null_segs for i in non_null_segs):
-            breakpoint()
+           #breakpoint()
+           print('any null segs in non_null_segs')
+           print('Error in nutrient_functions2.py')
         # If a segment is a tip, it has a distance to tip of 0
         tip_segs = np.where(mycelia['is_tip'][:num_total_segs])[0]
         dtt[tip_segs] = 0
@@ -426,7 +434,7 @@ def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCo
 
     if(np.any(gluc_curr < 0)):
         print('Glucose below 0.0:',np.min(gluc_curr))
-        breakpoint()
+       #breakpoint()
     cw_curr = mycelia['cw_i'][:num_total_segs]
     treha_curr = mycelia['treha_i'][:num_total_segs]
     cw_curr_concentrations = cw_curr/seg_volume
@@ -478,9 +486,13 @@ def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCo
             chosen_idx = np.array(np.where(dtt[nbr_of_idx] < dtt[idx])[0])
             
             if len(chosen_idx)>len(dtt[nbr_of_idx]):
-                breakpoint()
+               #breakpoint()
+               print('len(chosen_idx)>len(dtt[nbr_of_idx])')
+               print('Error in nutrient_functions2.py')
             elif len(chosen_idx) < 1:
-                breakpoint()
+               #breakpoint()
+               print('len(chosen_idx) < 1')
+               print('Error in nutrient_functions2.py')
             chosen_idx = list(chosen_idx)
             candidate_for_deletion = chosen_idx.copy()
             for i in range(len(candidate_for_deletion)):
@@ -488,7 +500,9 @@ def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCo
                 if mycelia['branch_id'][nbr_of_idx[candidate_for_deletion[i]]]==-1:
                     # print('Removing : ', candidate_for_deletion[i])
                     if candidate_for_deletion[i] not in chosen_idx:
-                        breakpoint()
+                       #breakpoint()
+                       print('candidate_for_deletion[i] not in chosen_idx')
+                       print('Error in nutrient_functions2.py')
                     chosen_idx.remove(candidate_for_deletion[i])
             to_nbrs.append(nbr_of_idx[chosen_idx].tolist())
         elif len(nbr_of_idx)<1:
@@ -502,9 +516,13 @@ def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCo
             chosen_idx = np.array(np.where(dtt[nbr_of_idx] > dtt[idx])[0])
             
             if len(chosen_idx)>len(dtt[nbr_of_idx]):
-                breakpoint()
+               #breakpoint()
+               print('len(chosen_idx)>len(dtt[nbr_of_idx])')
+               print('Error in nutrient_functions2.py')
             elif len(chosen_idx) < 1:
-                breakpoint()
+               #breakpoint()
+               print('len(chosen_idx) < 1')
+               print('Error in nutrient_functions2.py')
             
             chosen_idx = list(chosen_idx)
             candidate_for_deletion = chosen_idx.copy()
@@ -513,13 +531,17 @@ def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCo
                 if mycelia['branch_id'][nbr_of_idx[candidate_for_deletion[i]]]==-1:
                     # print('Removing : ', candidate_for_deletion[i])
                     if candidate_for_deletion[i] not in chosen_idx:
-                        breakpoint()
+                       #breakpoint()
+                       print('candidate_for_deletion[i] not in chosen_idx')
+                       print('Error in nutrient_functions2.py')
                     chosen_idx.remove(candidate_for_deletion[i])
                 # If a neighbor is a tip, don't export material from tip - it goes into growth instead
                 if mycelia['is_tip'][nbr_of_idx[candidate_for_deletion[i]]]==True:
                     # print('Removing : ', candidate_for_deletion[i])
                     if candidate_for_deletion[i] not in chosen_idx:
-                        breakpoint()
+                       #breakpoint()
+                       print('candidate_for_deletion[i] not in chosen_idx')
+                       print('Error in nutrient_functions2.py')
                     chosen_idx.remove(candidate_for_deletion[i])
             from_nbrs.append(nbr_of_idx[chosen_idx].tolist())
         elif len(nbr_of_idx)<1:
@@ -614,7 +636,7 @@ def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCo
         print('Indices:',negative_gluc_i_idx)
         print('Segment lengths:',mycelia['seg_length'][negative_gluc_i_idx])
         mycelia['gluc_i'][negative_gluc_i_idx] = np.finfo(np.float64).tiny;
-        breakpoint()
+       #breakpoint()
     negative_treha_i_idx = np.where(mycelia['treha_i'][:num_total_segs] < 0)[0]
 
     mycelia_before = mycelia['treha_i'][:num_total_segs].copy()
@@ -623,7 +645,7 @@ def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCo
         print('Trehalose below 0.0 after diffusion_term :',mycelia['treha_i'][negative_treha_i_idx])
         print('diffusion_term',gluc_diff_term[negative_treha_i_idx])
         mycelia['treha_i'][negative_treha_i_idx] = np.finfo(np.float64).tiny;
-        breakpoint()
+       #breakpoint()
 
     print('Min, Max glucose counts:',np.min(gluc_curr), np.max(gluc_curr))
     print('Sum net trehalose diffusion',np.sum(treha_diff_term[:num_total_segs]))
@@ -644,7 +666,9 @@ def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCo
                           mycelia['gluc_i'][:num_total_segs])
     convert_term = params['kc1_gluc']*alpha_gluc
     if (np.isnan(np.sum(convert_term))):
-            breakpoint()
+           #breakpoint()
+           print('isnan: convert_term:',convert_term)
+           print('Error in nutrient_functions2.py')
     #convert_term[np.where(mycelia['is_tip'])] = 0 #Why do this? Why can't the tip have metabolism?
     if (np.any(mycelia['gluc_i'][:num_total_segs] - params['dt_i']*convert_term < 0)):
         bad_idx = np.where((mycelia['gluc_i'][:num_total_segs] - params['dt_i']*convert_term) < 0)
@@ -652,7 +676,7 @@ def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCo
         print('Glucose before conversion:',mycelia['gluc_i'][bad_idx])
         print('Amount converted:',convert_term[bad_idx]*params['dt_i'])
         print('Convert rate:',convert_term[bad_idx])
-        breakpoint()
+       #breakpoint()
     mycelia_before = mycelia['gluc_i'][:num_total_segs].copy()
     # Here glucose is converted to other metabolites:
     mycelia['gluc_i'][:num_total_segs] -= params['dt_i']*convert_term
@@ -668,7 +692,7 @@ def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCo
         print('Glucose below 0.0 after convert_term :',mycelia['gluc_i'][negative_gluc_i_idx])
         print(mycelia['is_tip'][negative_gluc_i_idx])
         #if (np.min(mycelia['gluc_i'][:num_total_segs]) < 0.0):
-        breakpoint()
+        #breakpoint()
         mycelia['gluc_i'][negative_gluc_i_idx] = np.finfo(np.float64).tiny;
 
     if len(negative_cw_i_idx)>0:
@@ -735,7 +759,9 @@ def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCo
             continue
         
         if idx >= len(from_nbrs):
-            breakpoint()
+            #breakpoint()
+            print('idx >= len(from_nbrs)')
+            print('Error in nutrient_functions2.py')
         from_nbrs_idx = from_nbrs[idx]
         to_nbrs_idx = to_nbrs[idx]
         from_nbr_volume = seg_volume[from_nbrs_idx]
@@ -746,7 +772,9 @@ def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCo
 
         if (len(from_nbrs_idx) + len(to_nbrs_idx) >0):
             if np.isnan(sum(seg_lengths[from_nbrs_idx])):
-                breakpoint()
+                #breakpoint()
+                print('isnan: seg_lengths[from_nbrs_idx]')
+                print('Error in nutrient_functions2.py')
             # The amount of cell wall material transported is the product of the cell wall concentration in the vessicle and
             # the velocity of translocation the vessicle (determined by metabolism)
             # divided by the distance it must be transported (seg_length). Rather than divided the velocity of 
@@ -772,7 +800,9 @@ def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCo
             try:
                 volume_use_cw[(cw_conc_diff >= 0)] = from_nbr_volume[(cw_conc_diff >= 0)] # If conc_diff > 0, inflow from idx
             except:
-                breakpoint()
+                #breakpoint()
+                print('try: volume_use_cw[(cw_conc_diff >= 0)] = from_nbr_volume[(cw_conc_diff >= 0)]')
+                print('Error in nutrient_functions2.py')
             # Change to counts taking from teh correct segment volume
             cw_delta_count[idx] = np.sum(cw_from_scaled_nbrs*from_nbr_volume) - cw_curr_mod[idx]*seg_volume[idx]
             exprt_amt = (len(to_nbrs[idx]) > 0) * 1.0
@@ -788,14 +818,22 @@ def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCo
 
 
             if np.isnan(cw_delta_count[idx]):
-                breakpoint()
+                #breakpoint()
+                print('Isnan: cw_delta_count[idx]')
+                print('Error in nutrient_functions2.py')
      
     if (np.isnan(np.sum(cw_transport_term))):
-            breakpoint()
+            #breakpoint()
+            print('isnan: cw_transport_term')
+            print('Error in nutrient_functions2.py')
     if (np.isnan(np.sum(treha_advection_term))):
-            breakpoint()
+            #breakpoint()
+            print('isnan: treha_advection_term')
+            print('Error in nutrient_functions2.py')
     if (np.isnan(np.sum(gluc_advection_term))):
-            breakpoint()
+            #breakpoint()
+            print('isnan: gluc_advection_term')
+            print('Error in nutrient_functions2.py')
     
     print('Mean glucose advection',np.mean(np.abs(gluc_advection_term[:num_total_segs])))
     print('Net glucose advection',np.sum(gluc_advection_term[:num_total_segs]))
@@ -851,7 +889,7 @@ def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCo
     # breakpoint()
     if(np.any(mycelia['gluc_i'][:num_total_segs] < 0)):
         print('Glucose count below zero:', np.where(mycelia['gluc_i'][:num_total_segs] < 0))
-        breakpoint()
+        #breakpoint()
 
     #print('Advection - gluc_curr:',mycelia['gluc_i'][:num_total_segs])
     #%% End of chemical transport and metabolism
@@ -923,7 +961,9 @@ def uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd, time_step
     try:
         gluc_uptake[no_uptake_idx] = 0.0
     except:
-        breakpoint()
+        #breakpoint()
+        print('Error in nutrient_functions2.py')
+        print('No uptake index:',no_uptake_idx)
     #gluc_uptake[np.where(relative_seg_vol <1e-15)] = 0
     seg_lengths = mycelia['seg_length'][:num_total_segs]
     gluc_uptake[np.where(seg_lengths*seg_lengths < 0.1*params['diffusion_i_gluc'])[0]] = 0.0

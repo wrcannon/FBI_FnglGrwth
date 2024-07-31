@@ -199,7 +199,7 @@ def cost_of_growth(mycelia, idxs, grow_len):
         
         not_enough_cw = np.where(mycelia['cw_i'][idxs] < cost_grow_cw)[0]
         try:
-            grow_len[[not_enough_cw]] = grow_len[not_enough_cw]*mycelia['cw_i'][idxs[not_enough_cw]]/cost_grow_cw[not_enough_cw] #0.0
+            grow_len[not_enough_cw] = grow_len[not_enough_cw]*mycelia['cw_i'][idxs[not_enough_cw]]/cost_grow_cw[not_enough_cw] #0.0
         except:
             breakpoint()
         # cost_grow_cw[not_enough_cw] = 0.0

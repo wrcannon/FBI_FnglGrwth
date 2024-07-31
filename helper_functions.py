@@ -1441,7 +1441,10 @@ def plot_stat(count_times, count_stat, stat_type, folder_string, param_string, p
         key_word = 'stat_d'
     elif stat_type == 'Radii of Mycelia ({})'.format(params['plot_units_space']):
         key_word = 'stat_r'
-
+    elif stat_type == 'RMS Radii of Mycelia ({})'.format(params['plot_units_space']):
+        key_word = 'stat_rms_r'
+    elif stat_type == 'RMS Radii of Mycelia Tips ({})'.format(params['plot_units_space']):
+        key_word = 'stat_rms_r'
     # Save the plot
     fig_name = "Results/{}/Run{}/{}_{}_{}.png".format(param_string,
                                                       run,

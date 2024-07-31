@@ -24,7 +24,8 @@ num_cores = multiprocessing.cpu_count()
 
 # cwd_path ='/Users/libra/Desktop/FBI_FungalGrowth-Bill1'
 #cwd_path ='/Users/d3k137/docs/projects/boltzmann/code/06212017/run/fungal_growth/FBI_FungalGrowth2'
-# os.chdir(cwd_path)
+#cwd_path = '/scratch/d3k137'
+#os.chdir(cwd_path)
 
 import helper_functions as hf
 import growth_functions as gf
@@ -45,7 +46,8 @@ try:
     params, config = hf.get_configs(args.Input)
 except:
     print('failed to load parameters from command line')
-    params, config = hf.get_configs('parameters.ini')
+    #params, config = hf.get_configs('parameters.ini')
+    params, config = hf.get_configs('parameters_env3_noFusion.ini')
 # Define string constants
 left ='LEFT'
 right = 'RIGHT'
@@ -227,6 +229,7 @@ def driver_singleNutrient(run):
     count_max_radii = []
     count_avg_radii = []
     count_rms_radii = []
+    count_rms_tip_radii = []
     count_times = []
     count_biomass = []
     total_length_progression = []
@@ -271,7 +274,10 @@ def driver_singleNutrient(run):
         restart = params['restart']
     except NameError: restart = 0
     if (restart == 1):
-            restart_file = "Results/{}/Run{}/restart.pkl".format(param_string, run)
+            try:
+                restart_file = "Results/{}/Run{}/restart.pkl".format(param_string, run)
+            except:
+                print('No restart file found:', restart_file)
     elif (restart == 2):
             try:
                 restart_file = params['restart_file']
@@ -292,6 +298,7 @@ def driver_singleNutrient(run):
             N = round(len(x_vals)/2)-2
     
     print_increment = 1
+    print('Start: Current time: ', current_time, 'Final time: ', params['final_time'])
     while current_time < params['final_time']: 
         # Convert units
         if params['plot_units_time'] == 'days':
@@ -490,6 +497,9 @@ def driver_singleNutrient(run):
             count_tips.append(np.count_nonzero(mycelia['is_tip']))
             count_max_radii.append(max(np.sqrt(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2)))
             count_avg_radii.append(np.mean(np.sqrt(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2)))
+            
+            tip_idx = np.where(mycelia['is_tip'])[0]
+            count_rms_tip_radii.append(np.sqrt(np.mean(mycelia['xy2'][tip_idx,0]**2 + mycelia['xy2'][tip_idx,1]**2)))
             count_rms_radii.append(np.sqrt(np.mean(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2)))
             
             count_times.append(current_time)
@@ -828,6 +838,7 @@ def driver_singleNutrient(run):
                 'max_radii' : count_max_radii,
                 'avg_radii' : count_avg_radii,
                 'rms_radii' : count_rms_radii,
+                'rms_tip_radii' : count_rms_tip_radii,
                 'array_num_branches' : count_branches,
                 'array_num_tips' : count_tips,
                 'array_branching_density' : np.array(count_branches)/count_tips,
@@ -877,6 +888,7 @@ def driver_singleNutrient(run):
         # end
 
     # end
+    print('End: Current time: ', current_time, 'Final time: ', params['final_time'])
     
     # Write out a restart file
     file_name = "Results/{}/Run{}/restart_final.pkl".format(param_string, run)
@@ -1075,6 +1087,10 @@ def driver_singleNutrient(run):
     max_radii = max(np.sqrt(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2))
     avg_radii = np.mean(np.sqrt(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2))
     rms_radii = np.sqrt(np.mean(np.sqrt(mycelia['xy2'][:,0]**2 + mycelia['xy2'][:,1]**2)**2))
+    
+    tip_idx = np.where(mycelia['is_tip'])[0]
+    rms_tip_radii = np.sqrt(np.mean(mycelia['xy2'][tip_idx,0]**2 + mycelia['xy2'][tip_idx,1]**2))
+    
     time_total = t_1 - t_0
     time_mins, time_secs = divmod(time_total, 60)
     min_seg_length_nonTipIdx = (np.where(mycelia['is_tip'][:num_total_segs] == False))[0]
@@ -1091,6 +1107,8 @@ def driver_singleNutrient(run):
     count_max_radii.append(max_radii)
     count_avg_radii.append(avg_radii)
     count_rms_radii.append(rms_radii)
+    count_rms_tip_radii.append(rms_tip_radii)
+
     count_times.append(current_time)
     count_biomass.append(total_biomass)
     
@@ -1158,6 +1176,7 @@ def driver_singleNutrient(run):
         'max_radii' : count_max_radii,
         'avg_radii' : count_avg_radii,
         'rms_radii' : count_rms_radii,
+        'rms_tip_radii' : count_rms_tip_radii,
         'array_num_branches' : count_branches,
         'array_num_tips' : count_tips,
         'array_branching_density' : count_branches/count_tips,
@@ -1196,7 +1215,7 @@ def driver_singleNutrient(run):
     hf.plot_stat(count_times, count_branches, 'Num. of Branches', folder_string, param_string, params, run)
     hf.plot_stat(count_times, count_tips, 'Num. of Tips', folder_string, param_string, params, run)
     hf.plot_stat(count_times, count_branches/count_tips, 'Branching Density', folder_string, param_string, params, run)
-    hf.plot_stat(count_times, count_radii, 'Radii of Mycelia ({})'.format(params['plot_units_space']), folder_string, param_string, params, run)
+    hf.plot_stat(count_times, count_rms_tip_radii, 'RMS Radii of Mycelia Tips ({})'.format(params['plot_units_space']), folder_string, param_string, params, run)
     hf.plot_avg_treha_annulus(avg_treha_annulus,np.max(avg_treha_annulus), np.min(avg_treha_annulus), 'Average Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
     # hf.plot_avg_treha_annulus(avg_treha_annulus,np.max(avg_treha_annulus), 'Avgerage Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
     hf.plot_max_treha_annulus(max_treha_annulus,1.0, 'Max Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
