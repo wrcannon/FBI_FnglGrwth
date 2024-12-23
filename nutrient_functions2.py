@@ -257,8 +257,8 @@ def distance_to_tip(mycelia, num_total_segs):
     # If a segment is a neighbor of a segment with dtt of i, it has a dtt of i+1
     current_dist = 1
     while min(dtt[non_null_segs]) < 0:
-        print('min(dtt[non_null_segs]) = ', min(dtt[non_null_segs]))
-        print('Error in nutrient_functions2.py')
+        #print('min(dtt[non_null_segs]) = ', min(dtt[non_null_segs]))
+        #print('Error in nutrient_functions2.py')
         #breakpoint()
         # print('current_dist = ', current_dist)
         # Loop through all segments
@@ -683,6 +683,8 @@ def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCo
     mycelia['cw_i'][:num_total_segs] += params['dt_i']*(params['yield_c_in_mmoles']*convert_term)
     #mycelia['treha_i'][:num_total_segs] += params['dt']*(convert_term*0.3*0.1)
     mycelia['treha_i'][:num_total_segs] += params['dt_i']*(convert_term*params['convert_metabolite'])
+    # turn trehalose off:
+    mycelia['treha_i'][:num_total_segs] = 0.0
 
     negative_cw_i_idx = np.where(mycelia['cw_i'][:num_total_segs] < 0)[0]
     negative_treha_i_idx = np.where(mycelia['treha_i'][:num_total_segs] < 0)[0]
@@ -850,10 +852,18 @@ def transloc(mycelia, params, num_total_segs, dtt, isActiveTrans, whichInitialCo
         print('Net active transport of CW greater than zero')
         #for idx in range(num_total_segs):
         #    diffcw =  -cw_transport_term[idx]
-    # Sum/net advection should be zero:
-    relative_net_advection = np.abs(np.sum(gluc_advection_term[:num_total_segs]))/np.mean(np.abs(gluc_advection_term[:num_total_segs]))
+    # Sum/net advection should be effectively zero:
+    if np.sum(gluc_advection_term[:num_total_segs]) > 0.0:
+        relative_net_advection = np.abs(np.sum(gluc_advection_term[:num_total_segs]))/np.mean(np.abs(gluc_advection_term[:num_total_segs]))
+    else:
+        relative_net_advection = 0.0
     if (relative_net_advection > 1.0e-15):
-        print('Glucose advection too high: ', relative_net_advection)
+        print('Glucose advection possibly too high: ', relative_net_advection)
+    ###
+    #if np.isnan(np.sum(out_vec)):
+    #    out_vec = out_vec[~numpy.isnan(out_vec)] # just remove nan elements from vector
+    #out_vec[out_vec > 709] = 709
+    ###
 
     # Update concentrations due to advection
     if (np.any(mycelia['cw_i'][:num_total_segs] + params['dt_i']*cw_transport_term < 0)):

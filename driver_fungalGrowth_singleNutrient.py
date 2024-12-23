@@ -47,7 +47,7 @@ try:
 except:
     print('failed to load parameters from command line')
     #params, config = hf.get_configs('parameters.ini')
-    params, config = hf.get_configs('parameters_env3_noFusion.ini')
+    params, config = hf.get_configs('parameters_env4_noFusion.ini')
 # Define string constants
 left ='LEFT'
 right = 'RIGHT'
@@ -97,10 +97,11 @@ def driver_singleNutrient(run):
 
     # Is the nutrient background variable or fixed?
     # variable = 1; fixed = 0
-    var_nutrient_backgrnd = 1
+    var_nutrient_backgrnd = backDiff
     # We may/may not still want excreted compounds to diffuse, though
-    glucDiff = 0
-    trehaDiff = 1
+    if backDiff == 0:
+        glucDiff = 0
+        trehaDiff = 0
     
 
     # Is fungal fusion (anastomosis) active? 1 = YES, 0 = NO
@@ -172,7 +173,7 @@ def driver_singleNutrient(run):
     # What is the probability for fusion to be established?
     try: 
         chance_to_fuse = params['chance_to_fuse']
-    except NameError: chance_to_fuse = 0.25
+    except NameError: chance_to_fuse = 0.5
     print('The probability for fungal fusion is set to : ', chance_to_fuse)
     
     ###########################################################################
@@ -191,8 +192,13 @@ def driver_singleNutrient(run):
     folder_string, param_string = hf.get_filepath(params)
     # Create appropriate folder
     if not os.path.exists('Results/{}/Run{}'.format(param_string, run)):
-        os.makedirs('Results/{}/Run{}'.format(param_string, run))
-
+        try:
+            os.makedirs('Results/{}/Run{}'.format(param_string, run))
+        except FileExistsError:
+            print('File exists error:', 'Results/{}/Run{}'.format(param_string, run))
+        except:
+            print('Failed to create folder:', 'Results/{}/Run{}'.format(param_string, run))
+   
     grid_file = "Results/{}/Run{}/grid_coordinates_temp.txt".format(param_string, run)
     thisfile = open(grid_file,'w')
     for i in range(np.shape(x_vals)[0]): 
@@ -209,12 +215,6 @@ def driver_singleNutrient(run):
     if not os.path.exists('Results/{}/Run{}'.format(param_string, run)):
         os.makedirs('Results/{}/Run{}'.format(param_string, run))
     
-    # Plot the initial nutrient background:
-    glucose_ext = sub_e_gluc/params['vol_grid']*1e12 # Convert to molar quantities for display
-    max_e_gluc = np.max(glucose_ext)
-    hf.plot_externalsub(sub_e_gluc, yticks, yticklabels, 0.0, max_e_gluc, 'Se', folder_string, param_string, params, run)
-
-
     # Save copy of the parameters used
     params_file = 'Results/{}/Run{}/{}_params.ini'.format(param_string,
                                                           run,
@@ -297,6 +297,13 @@ def driver_singleNutrient(run):
             file.close()
             N = round(len(x_vals)/2)-2
     
+    if (restart == 0):
+        # Plot the initial nutrient background:
+        glucose_ext = sub_e_gluc/params['vol_grid']*1e12 # Convert to molar quantities for display
+        max_e_gluc = np.max(glucose_ext)
+        hf.plot_externalsub(sub_e_gluc, yticks, yticklabels, 0.0, max_e_gluc, 'Se', folder_string, param_string, params, run)
+
+
     print_increment = 1
     print('Start: Current time: ', current_time, 'Final time: ', params['final_time'])
     while current_time < params['final_time']: 
@@ -410,7 +417,7 @@ def driver_singleNutrient(run):
         adj_branch_rate = 1 - (branch_rate**(1/n))
         adj_branch_rate = branch_rate
         if any(np.where(mycelia['can_branch'])[0]):
-            reached_max_branches, mycelia, num_total_segs, dtt = gf.branching(mycelia, params, 
+            reached_max_branches, mycelia, num_total_segs, dtt = gf.branching(mycelia, sub_e_gluc, params, 
                                         num_total_segs, dtt, x_vals, y_vals, 
                                         isCalibration, dist2Tip_new, 
                                         fungal_fusion, restrictBranching,
@@ -447,7 +454,7 @@ def driver_singleNutrient(run):
                 print('Max grid density = ', np.max(grd_density))
             
         #if (current_time > 0.25* print_time):
-            file_name = "Results/{}/Run{}/restart.pkl".format(param_string, run)
+            file_name = "Results/{}/Run{}/restart_t={}.pkl".format(param_string, run, current_time)
             file = open(file_name,'wb')
             pickle.dump(mycelia,file)
             pickle.dump(num_total_segs,file)
@@ -455,6 +462,8 @@ def driver_singleNutrient(run):
             pickle.dump(sub_e_gluc,file)
             pickle.dump(sub_e_treha,file)
             pickle.dump(current_time,file)
+            file.flush()
+            os.fsync(file.fileno()) 
             file.close()
 
         # if current_step % (4*160) == 0: 
@@ -474,8 +483,9 @@ def driver_singleNutrient(run):
                 treha_ext = sub_e_treha/params['vol_grid']*1e12 # Convert to molar quantities for display
                 max_e_treha = np.max(treha_ext)
                 # max_e_treha_fixed = 1e-11
-                hf.plot_externalsub_treha(sub_e_treha, yticks, yticklabels, current_time, max_e_treha, 'Se', folder_string, param_string, params, run)
-                hf.plot_externalsub_treha_hyphae(sub_e_treha, mycelia, num_total_segs, yticks, yticklabels, current_time, max_e_treha, 'Se', folder_string, param_string, params, run)
+                if trehaDiff == 1:
+                    hf.plot_externalsub_treha(sub_e_treha, yticks, yticklabels, current_time, max_e_treha, 'Se', folder_string, param_string, params, run)
+                    hf.plot_externalsub_treha_hyphae(sub_e_treha, mycelia, num_total_segs, yticks, yticklabels, current_time, max_e_treha, 'Se', folder_string, param_string, params, run)
             
             # dist_from_center = []
             # for i in range(num_total_segs):
@@ -865,20 +875,28 @@ def driver_singleNutrient(run):
                 'avg_treha_annulus' : avg_treha_annulus,
                 'max_treha_annulus' : max_treha_annulus,
                 'min_treha_annulus' : min_treha_annulus}
-            output_file_csv = "Results/{}/Run{}/{}_outputdata_{}.csv".format(param_string, 
+            output_file_csv = "Results/{}/Run{}/{}_outputdata_{}_t={:0.2f}.csv".format(param_string, 
                                                                       run, 
                                                                       param_string, 
-                                                                      run)
-            with open(output_file_csv, 'w') as csv_file:  
-                writer = csv.writer(csv_file)
-                for key, value in output_dict.items():
-                    writer.writerow([key, value])
-            
+                                                                      run,
+                                                                      current_time)
+            #with open(output_file_csv, 'w') as csv_file:  
+            #    writer = csv.writer(csv_file)
+            #    for key, value in output_dict.items():
+            #        writer.writerow([key, value])
+            # Write to output csv file
+            csv_file = open(output_file_csv, 'w')
+            writer = csv.writer(csv_file)
+            for key, value in output_dict.items():
+                writer.writerow([key, value])
+            csv_file.flush()
+            os.fsync(csv_file.fileno())
+            csv_file.close()
             # end xxx           
             
             WWWW = np.where(avg_treha_annulus == np.max(avg_treha_annulus))[0]
             print('Max avg treha at contour : ', WWWW)
-            hf.plot_avg_treha_annulus(avg_treha_annulus,np.max(avg_treha_annulus), np.min(avg_treha_annulus), 'Avgerage Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
+            #hf.plot_avg_treha_annulus(avg_treha_annulus,np.max(avg_treha_annulus), np.min(avg_treha_annulus), 'Avgerage Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
             hf.plot_max_treha_annulus(max_treha_annulus,1.0, 'Max Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
             hf.plot_min_treha_annulus(min_treha_annulus,1.0, 'Min Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
         # Update time
@@ -891,7 +909,7 @@ def driver_singleNutrient(run):
     print('End: Current time: ', current_time, 'Final time: ', params['final_time'])
     
     # Write out a restart file
-    file_name = "Results/{}/Run{}/restart_final.pkl".format(param_string, run)
+    file_name = "Results/{}/Run{}/restart_t={}.pkl".format(param_string, run, current_time)
     file = open(file_name,'wb')
     pickle.dump(mycelia,file)
     pickle.dump(num_total_segs,file)
@@ -899,6 +917,8 @@ def driver_singleNutrient(run):
     pickle.dump(sub_e_gluc,file)
     pickle.dump(sub_e_treha,file)
     pickle.dump(current_time,file)
+    file.flush()
+    os.fsync(file.fileno()) 
     file.close()
     
     # Plot results at final time
@@ -909,9 +929,10 @@ def driver_singleNutrient(run):
         hf.plot_externalsub(sub_e_gluc, yticks, yticklabels, current_time, params['init_sub_e_gluc'], 'Se', folder_string, param_string, params, run)
         hf.plot_externalsub_hyphae(sub_e_gluc, mycelia, num_total_segs, yticks, yticklabels, current_time, params['init_sub_e_gluc'], 'Se', folder_string, param_string, params, run)
         
-        max_e_treha = np.max(sub_e_treha)
-        hf.plot_externalsub_treha(sub_e_treha, yticks, yticklabels, current_time, max_e_treha, 'Se', folder_string, param_string, params, run)
-        hf.plot_externalsub_treha_hyphae(sub_e_treha, mycelia, num_total_segs, yticks, yticklabels, current_time, max_e_treha, 'Se', folder_string, param_string, params, run)
+        if trehaDiff == 1:
+            max_e_treha = np.max(sub_e_treha)
+            hf.plot_externalsub_treha(sub_e_treha, yticks, yticklabels, current_time, max_e_treha, 'Se', folder_string, param_string, params, run)
+            hf.plot_externalsub_treha_hyphae(sub_e_treha, mycelia, num_total_segs, yticks, yticklabels, current_time, max_e_treha, 'Se', folder_string, param_string, params, run)
             
     
     for i in range(num_total_segs):
@@ -1202,21 +1223,26 @@ def driver_singleNutrient(run):
         'avg_treha_annulus' : avg_treha_annulus,
         'max_treha_annulus' : max_treha_annulus,
         'min_treha_annulus' : min_treha_annulus}
-    output_file_csv = "Results/{}/Run{}/{}_outputdata_{}.csv".format(param_string, 
+    output_file_csv = "Results/{}/Run{}/{}_outputdata_{}_t={:0.2f}.csv".format(param_string, 
                                                                       run, 
                                                                       param_string, 
-                                                                      run)
-    with open(output_file_csv, 'w') as csv_file:  
-        writer = csv.writer(csv_file)
-        for key, value in output_dict.items():
-           writer.writerow([key, value])
-          
+                                                                      run,
+                                                                      current_time)
+    # write to csv_file:  
+    csv_file = open(output_file_csv, 'w')
+    writer = csv.writer(csv_file)
+    for key, value in output_dict.items():
+        writer.writerow([key, value])
+    csv_file.flush()
+    os.fsync(csv_file.fileno())
+    csv_file.close()
+
     # Plot some stats       
     hf.plot_stat(count_times, count_branches, 'Num. of Branches', folder_string, param_string, params, run)
     hf.plot_stat(count_times, count_tips, 'Num. of Tips', folder_string, param_string, params, run)
     hf.plot_stat(count_times, count_branches/count_tips, 'Branching Density', folder_string, param_string, params, run)
     hf.plot_stat(count_times, count_rms_tip_radii, 'RMS Radii of Mycelia Tips ({})'.format(params['plot_units_space']), folder_string, param_string, params, run)
-    hf.plot_avg_treha_annulus(avg_treha_annulus,np.max(avg_treha_annulus), np.min(avg_treha_annulus), 'Average Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
+    #hf.plot_avg_treha_annulus(avg_treha_annulus,np.max(avg_treha_annulus), np.min(avg_treha_annulus), 'Average Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
     # hf.plot_avg_treha_annulus(avg_treha_annulus,np.max(avg_treha_annulus), 'Avgerage Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
     hf.plot_max_treha_annulus(max_treha_annulus,1.0, 'Max Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
     hf.plot_min_treha_annulus(min_treha_annulus,1.0, 'Min Trehalose Per Annulus', folder_string, param_string, current_time, params, run)
@@ -1227,12 +1253,16 @@ def driver_singleNutrient(run):
 ## Run Multiple iterations
 try:
     num_runs = params['num_parallel_runs']
-except NameError: num_runs = 1
+except: 
+    num_runs = 1
 folder_string, param_string = hf.get_filepath(params)
 
 # Create appropriate folder
 if not os.path.exists('Results/{}/Avg{}'.format(param_string, num_runs)):
-    os.makedirs('Results/{}/Avg{}'.format(param_string, num_runs))
+    try:
+        os.makedirs('Results/{}/Avg{}'.format(param_string, num_runs))
+    except: 
+        pass
 
 # Initialize arrays for storing results
 all_branches = np.array([])
@@ -1242,6 +1272,7 @@ all_radii = np.array([])
 
 # Run the same simulation in parallel
 output_dict = Parallel(n_jobs=min(num_runs,num_cores))(delayed(driver_singleNutrient)(run) for run in range(num_runs))
+
   
 if num_runs > 1:
     # Convert data to matrix
@@ -1261,13 +1292,13 @@ if num_runs > 1:
     avg_branches = np.average(all_branches, axis=0)
     avg_tips = np.average(all_tips, axis=0)
     avg_density = np.average(all_density, axis=0)
-    avg_radii = np.average(all_radii, axis=0)
+    #avg_radii = np.average(all_radii, axis=0)
         
     # Find std. dev. values for each time
     std_branches = np.std(all_branches, axis=0)
     std_tips = np.std(all_tips, axis=0)
     std_density = np.std(all_density, axis=0)
-    std_radii = np.std(all_radii, axis=0)
+    #std_radii = np.std(all_radii, axis=0)
     
     # Plot avgs with error bars
     hf.plot_errorbar_stat(output_dict[0]['array_times'].flatten(), 
@@ -1285,11 +1316,11 @@ if num_runs > 1:
                           'Avg. Branching Density ({} Iterations)'.format(
                               num_runs), 
                           folder_string, param_string, params, num_runs)
-    hf.plot_errorbar_stat(output_dict[0]['array_times'].flatten(), 
-                          avg_radii, std_radii, 
-                          'Avg. Radii in {} ({} Iterations)'.format(
-                              params['plot_units_space'], num_runs), 
-                          folder_string, param_string, params, num_runs)
+    #hf.plot_errorbar_stat(output_dict[0]['array_times'].flatten(), 
+    #                      avg_radii, std_radii, 
+    #                      'Avg. Radii in {} ({} Iterations)'.format(
+    #                          params['plot_units_space'], num_runs), 
+    #                      folder_string, param_string, params, num_runs)
 
 
 

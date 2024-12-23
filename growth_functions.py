@@ -150,7 +150,7 @@ def cost_of_growth(mycelia, idxs, grow_len):
     Purpose
     -------
     Calculate the amount of nutrients needed to grow. If the cost is higher
-    than the amount available, adjust the amount of growth.
+    than the amount of nutrient available, adjust the amount of growth downwards.
     """
     if any(grow_len > 1e2):
         breakpoint()
@@ -545,6 +545,8 @@ def split_segment(mycelia, num_total_segs, x_vals, y_vals, isCalibration, dist2T
     # print('branch(s) undergoing segment splitting : ', branch_ids)
 
     # Record branch and segment id
+    if np.shape(mycelia['branch_id'])[0] <= max(new_tips):
+        mycelia = extend_mycelia(mycelia)
     mycelia['branch_id'][new_tips] = mycelia['branch_id'][tips_to_split]
     mycelia['seg_id'][new_tips] = mycelia['seg_id'][tips_to_split]+1
 
@@ -736,8 +738,91 @@ def extension(mycelia, params, num_total_segs, dtt, x_vals, y_vals,
 
 # ----------------------------------------------------------------------------
 
+def extend_mycelia(mycelia):
+
+    max_total_segs = np.shape(mycelia['cw_i'])[0]
+    new_max_total_segs = np.int64(max(np.shape(mycelia['cw_i']))*2)
+
+    new_array = np.resize(mycelia['branch_id'],(new_max_total_segs,1))
+    new_array[max_total_segs:] = 0
+    mycelia['branch_id'] = new_array
+
+    new_array = np.resize(mycelia['seg_id'],(new_max_total_segs,1))
+    new_array[max_total_segs:] = 0
+    mycelia['seg_id'] = new_array
+
+    new_array = np.resize(mycelia['xy1'],(new_max_total_segs,2))
+    new_array[max_total_segs:,:] = 0
+    mycelia['xy1'] = new_array
+
+    new_array = np.resize(mycelia['xy2'],(new_max_total_segs,2))
+    new_array[max_total_segs:,:] = 0
+    mycelia['xy2'] = new_array
+
+    new_array = np.resize(mycelia['angle'],(new_max_total_segs,1))
+    new_array[max_total_segs:] = 0
+    mycelia['angle'] = new_array
+
+    new_array = np.resize(mycelia['seg_length'],(new_max_total_segs,1))
+    new_array[max_total_segs:] = 0
+    mycelia['seg_length'] = new_array
+
+    new_array = np.resize(mycelia['seg_vol'],(new_max_total_segs,1))
+    new_array[max_total_segs:] = 0
+    mycelia['seg_vol'] = new_array
+
+    new_array = np.resize(mycelia['dist_to_septa'],(new_max_total_segs,1))
+    new_array[max_total_segs:] = 0
+    mycelia['dist_to_septa'] = new_array
+
+    new_array = np.resize(mycelia['xy_e_idx'],(new_max_total_segs,2))
+    new_array[max_total_segs:,:] = 0
+    mycelia['xy_e_idx'] = new_array
+    
+    mycelia['share_e'].extend([None]*(new_max_total_segs-max_total_segs))
+
+    new_array = np.resize(mycelia['cw_i'],(new_max_total_segs,1))
+    new_array[max_total_segs:] = 0
+    mycelia['cw_i'] = new_array
+
+    new_array = np.resize(mycelia['gluc_i'],(new_max_total_segs,1))
+    new_array[max_total_segs:] = 0
+    mycelia['gluc_i'] = new_array
+
+    new_array = np.resize(mycelia['can_branch'],(new_max_total_segs,1))
+    new_array[max_total_segs:] = 0
+    mycelia['can_branch'] = new_array
+
+    new_array = np.resize(mycelia['is_tip'],(new_max_total_segs,1))
+    new_array[max_total_segs:] = 0
+    mycelia['is_tip'] = new_array
+
+    new_array = np.resize(mycelia['septa_loc'],(new_max_total_segs,1))
+    new_array[max_total_segs:] = 0
+    mycelia['septa_loc'] = new_array
+
+    mycelia['nbr_idxs'].extend([None]*(new_max_total_segs-max_total_segs))
+
+    new_array = np.resize(mycelia['nbr_num'],(new_max_total_segs,1))
+    new_array[max_total_segs:] = 0
+    mycelia['nbr_num'] = new_array
+
+    new_array = np.resize(mycelia['bypass'],(new_max_total_segs,1))
+    new_array[max_total_segs:] = 0
+    mycelia['bypass'] = new_array
+
+    new_array = np.resize(mycelia['treha_i'],(new_max_total_segs,1))
+    new_array[max_total_segs:] = 0
+    mycelia['treha_i'] = new_array
+
+    new_array = np.resize(mycelia['dist_from_center'],(new_max_total_segs,1))
+    new_array[max_total_segs:] = 0
+    mycelia['dist_from_center'] = new_array
+
+    return mycelia
+
 # Branching - Main function for new branches
-def branching(mycelia, params, num_total_segs, dtt, x_vals, y_vals, 
+def branching(mycelia, sub_e_gluc, params, num_total_segs, dtt, x_vals, y_vals, 
               isCalibration, dist2Tip_new, fungal_fusion, restrictBranching,
               chance_to_fuse, branch_rate=1.0):
     """
@@ -778,6 +863,7 @@ def branching(mycelia, params, num_total_segs, dtt, x_vals, y_vals,
     # mycelia['can_branch'][fidx] = False
     
     use_original = 0
+    apical_dominance = 0
     if (restrictBranching == 0):
         potential_branch_idxs = (np.where(mycelia['can_branch'])[0])
     else:
@@ -787,7 +873,22 @@ def branching(mycelia, params, num_total_segs, dtt, x_vals, y_vals,
         potential_branch_idxs = (tmp_potential_branch_idxs[restricting])
         # if np.max(num_total_segs > 8):
         #     breakpoint()
-    
+    # Enforce apical dominance such that if the nutrient concentration is high in the respective tip, branching is less likely
+    # This is done by reducing the probability of branching by the nutrient concentration
+    mycelia['branch_id'][potential_branch_idxs]
+    branch_tip_idx = np.intersect1d(mycelia['branch_id'],mycelia['is_tip'])
+    tip_idx = np.where(mycelia['is_tip'])[0]
+    if (apical_dominance == 1):
+        potential_branch_idxs = np.where(mycelia['gluc_i'][potential_branch_idxs] > mycelia['gluc_i'][tip_idx][potential_branch_idxs])[0]
+        # Apical dominance is when the tip has more nutrients available than the hyphal segments preciding the tip
+        tip_xy_e_idx = mycelia['xy_e_idx'][tip_idx][potential_branch_idxs]
+        branching_xy_e_idx = mycelia['xy_e_idx'][potential_branch_idxs]
+        # If the tip has more nutrients than the hyphal segments preciding the tip, then branching is less likely
+        potential_branch_idxs_test = np.where(sub_e_gluc[tip_xy_e_idx] < sub_e_gluc[branching_xy_e_idx])[0]
+        # Get the 
+        
+
+
     # Reduce the number of branches by the branch rate
     #fidx_range = np.arange(1,len(potential_branch_idxs),1, dtype=int)
     #adjusted_branch_rate = branch_rate*(params['kg1_wall']/params['sl'])
@@ -819,8 +920,9 @@ def branching(mycelia, params, num_total_segs, dtt, x_vals, y_vals,
                                                        mycelia['cw_i'][potential_branch_idxs])
         len0 = params['kg1_wall']*params['dt_i']
         branch_len0 = np.ones((len(potential_branch_idxs),1))*len0
+
+        # Does this ensure that a branch length is only as long as the available nutrients allow? But after ensuring tip growth?
         branch_len, cost_branch_gluc, cost_branch_cw = cost_of_growth(mycelia, np.array(potential_branch_idxs), branch_len0)
-        cost_multiple = 4.0#0.5
         # prob = 1.0 - np.exp(-(mycelia['cw_i'][potential_branch_idxs] - cost_multiple*cost_branch_cw)/(cost_multiple*cost_branch_cw))
         #prob = np.exp((branch_len-1*branch_len0)/branch_len0)
 
@@ -829,6 +931,7 @@ def branching(mycelia, params, num_total_segs, dtt, x_vals, y_vals,
         rand_vals = np.random.uniform(0, 1, (len(potential_branch_idxs),1))
         #rand_vals = np.ones((len(potential_branch_idxs),1))* 0.5
         #true_idx = np.where((prob - rand_vals).flatten() > 0)
+        # Does this ensure branching occurs on the periphery?
         true_idx = np.where(mycelia['dist_from_center'][potential_branch_idxs] >= 0.5*max(mycelia['dist_from_center'][:num_total_segs][0]))[0]
 
         # true_idx = np.where((prob - rand_vals).flatten() > 0)
@@ -846,8 +949,9 @@ def branching(mycelia, params, num_total_segs, dtt, x_vals, y_vals,
             # Locations of new branch tips
             new_tips = np.arange(len(true_branch_ids)) + num_total_segs
             if np.max(new_tips) > np.shape(mycelia['cw_i'])[0]:
-                reached_max_branches = True;
-                return reached_max_branches, mycelia, num_total_segs, dtt
+                #reached_max_branches = True;
+                #return reached_max_branches, mycelia, num_total_segs, dtt
+                mycelia = extend_mycelia(mycelia)
             
             # print('new branch(es):', new_tips)
             if(np.shape(mycelia['cw_i'][new_tips]) != np.shape(cost_branch_cw)):

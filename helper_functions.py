@@ -486,10 +486,13 @@ def plot_fungus(mycelia, num_total_segs, curr_time, folder_string, param_string,
 
     """
     # cur_len = len(hy)
-    si_conc = mycelia['cw_i'][:num_total_segs]/mycelia['seg_vol'][:num_total_segs] *1.0e12
-    idx_to_display = np.intersect1d(np.where(mycelia['branch_id'][:num_total_segs]>-1)[0], np.where(np.isfinite(si_conc))[0])
+    idx_to_display = np.where(mycelia['seg_vol'] > 0)[0]
+    si_conc = mycelia['cw_i'][idx_to_display]/mycelia['seg_vol'][idx_to_display] *1.0e12
+    
 
-    si = si_conc[idx_to_display].flatten()
+    #si = si_conc[idx_to_display].flatten()
+    si = si_conc.flatten()
+    
     x1 = mycelia['xy1'][idx_to_display, 0].tolist()
     x2 = mycelia['xy2'][idx_to_display, 0].tolist()
     y1 = mycelia['xy1'][idx_to_display, 1].tolist()
@@ -611,9 +614,10 @@ def plot_fungus_gluc(mycelia, num_total_segs, curr_time, folder_string, param_st
 
     """
     # cur_len = len(hy)
-    si_conc = mycelia['gluc_i']/mycelia['seg_vol'] *1.0e12
-    idx_to_display = np.intersect1d(np.where(mycelia['branch_id'][:num_total_segs]>-1)[0], np.where(np.isfinite(si_conc))[0])
-    si = si_conc[idx_to_display].flatten()
+    idx_to_display = np.where(mycelia['seg_vol'] > 0)[0]
+    si_conc = mycelia['gluc_i'][idx_to_display]/mycelia['seg_vol'][idx_to_display] *1.0e12
+
+    si = si_conc.flatten()
     x1 = mycelia['xy1'][idx_to_display, 0].tolist()
     x2 = mycelia['xy2'][idx_to_display, 0].tolist()
     y1 = mycelia['xy1'][idx_to_display, 1].tolist()
@@ -813,10 +817,10 @@ def plot_fungus_treha(mycelia, num_total_segs, curr_time, folder_string, param_s
     Color of a segment corresponds to internal substrate concentration.
 
     """
-    # cur_len = len(hy)
-    si_conc = mycelia['treha_i']/mycelia['seg_vol'] *1.0e12
-    idx_to_display = np.intersect1d(np.where(mycelia['branch_id'][:num_total_segs]>-1)[0], np.where(np.isfinite(si_conc))[0])
-    si = si_conc[idx_to_display].flatten()
+    idx_to_display = np.where(mycelia['seg_vol'] > 0)[0]
+    si_conc = mycelia['treha_i'][idx_to_display]/mycelia['seg_vol'][idx_to_display] *1.0e12
+
+    si = si_conc.flatten()
     x1 = mycelia['xy1'][idx_to_display, 0].tolist()
     x2 = mycelia['xy2'][idx_to_display, 0].tolist()
     y1 = mycelia['xy1'][idx_to_display, 1].tolist()
@@ -975,7 +979,7 @@ def plot_fungus_treha(mycelia, num_total_segs, curr_time, folder_string, param_s
     
 #-----------------------------------------------------------------------------
 
-def plot_externalsub(sub_e, yticks, y_tick_labels, curr_time, sub_e_max, plot_type, folder_string, param_string, params, run):
+def plot_externalsub(sub_e_orig, yticks, y_tick_labels, curr_time, sub_e_max, plot_type, folder_string, param_string, params, run):
     """
     Parameters
     ----------
@@ -1001,11 +1005,19 @@ def plot_externalsub(sub_e, yticks, y_tick_labels, curr_time, sub_e_max, plot_ty
     Plot external nutrient concentration.
 
     """
+    sub_e = sub_e_orig.copy()
     # Convert to molar quantities for display
-    sub_e = np.log10(sub_e/params['vol_grid']*1e12)
-    inf_idx = np.where(np.isinf(sub_e)) 
-    sub_e[inf_idx] = np.min(sub_e[np.where(np.isfinite(sub_e))])-1
+    idx = np.where(sub_e > 0)
+    nidx = np.where(sub_e <= 0)
+    # Set concentrations to log concentrations
+    sub_e[idx] = np.log10(sub_e[idx]/params['vol_grid']*1e12)
+    # set the other values to the min value
+    #if np.any(idx):
+    #    sub_e[nidx] = np.min(sub_e[idx])-1
+    # else:
+    sub_e[nidx] = -20.0 # set log concentration to -30.0
     sub_e_max = np.max(sub_e)
+    
     
     # For the orange-blue color map
     top = cm.get_cmap('Oranges_r', 256) # r means reversed version
@@ -1064,7 +1076,7 @@ def plot_externalsub(sub_e, yticks, y_tick_labels, curr_time, sub_e_max, plot_ty
     fig.savefig(fig_name, bbox_inches="tight")
     plt.close()
 
-def plot_externalsub_hyphae(sub_e, mycelia, num_total_segs, yticks, y_tick_labels, curr_time, sub_e_max, plot_type, folder_string, param_string, params, run):
+def plot_externalsub_hyphae(sub_e_orig, mycelia, num_total_segs, yticks, y_tick_labels, curr_time, sub_e_max, plot_type, folder_string, param_string, params, run):
     """
     Parameters
     ----------
@@ -1091,11 +1103,17 @@ def plot_externalsub_hyphae(sub_e, mycelia, num_total_segs, yticks, y_tick_label
 
     """
     # Convert to molar quantities for display
-    sub_e = np.log10(sub_e/params['vol_grid']*1e12)
-    inf_idx = np.where(np.isinf(sub_e)) 
-    sub_e[inf_idx] = np.min(sub_e[np.where(np.isfinite(sub_e))])-1
+    sub_e = sub_e_orig.copy()
+    idx = np.where(sub_e > 0)
+    nidx = np.where(sub_e <= 0)
+    sub_e[idx] = np.log10(sub_e[idx]/params['vol_grid']*1e12)
+    # set the other values to the min value
+    #if np.any(idx):
+    #    sub_e[nidx] = np.min(sub_e[idx])-1
+    # else:
+    sub_e[nidx] = -20.0 # set log concentration to -30.0
     sub_e_max = np.max(sub_e)
-    
+
     # For the orange-blue color map
     top = cm.get_cmap('Oranges_r', 256) # r means reversed version
     bottom = cm.get_cmap('Blues', 256)# combine it all
@@ -1147,9 +1165,10 @@ def plot_externalsub_hyphae(sub_e, mycelia, num_total_segs, yticks, y_tick_label
     ngrids = len(sub_e)
     max_xy = np.max(y_tick_labels)
 
-    si_conc = mycelia['gluc_i']/mycelia['seg_vol'] *1.0e12
-    idx_to_display = np.intersect1d(np.where(mycelia['branch_id'][:num_total_segs]>-1)[0], np.where(np.isfinite(si_conc))[0])
-    si = si_conc[idx_to_display].flatten()
+    idx_to_display = np.where(mycelia['seg_vol'] > 0)[0]
+    si_conc = mycelia['gluc_i'][idx_to_display]/mycelia['seg_vol'][idx_to_display] *1.0e12
+    
+    si = si_conc.flatten()
     x1 = (mycelia['xy1'][idx_to_display, 0]*ngrids/2/max_xy + ngrids/2).tolist()
     x2 = (mycelia['xy2'][idx_to_display, 0]*ngrids/2/max_xy + ngrids/2).tolist()
     y1 = (mycelia['xy1'][idx_to_display, 1]*ngrids/2/max_xy + ngrids/2).tolist()
@@ -1185,7 +1204,7 @@ def plot_externalsub_hyphae(sub_e, mycelia, num_total_segs, yticks, y_tick_label
     plt.close()
 
 
-def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plot_type, folder_string, param_string, params, run):
+def plot_externalsub_treha(sub_e_orig, yticks, yticklabels, curr_time, sub_e_max, plot_type, folder_string, param_string, params, run):
     """
     Parameters
     ----------
@@ -1212,13 +1231,21 @@ def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plo
 
     """
     # Convert to molar quantities for display
-    sub_e = np.log10(sub_e/params['vol_grid']*1e12) 
-    sub_e_max = np.max(sub_e[np.where(np.isfinite(sub_e))])
+    #sub_e = np.log10(sub_e/params['vol_grid']*1e12) 
+    #sub_e_max = np.max(sub_e[np.where(np.isfinite(sub_e))])
 
-    sub_e[np.where(np.isinf(sub_e))] = np.min(sub_e[np.where(np.isfinite(sub_e))])-1
+    #sub_e[np.where(np.isinf(sub_e))] = np.min(sub_e[np.where(np.isfinite(sub_e))])-1
     #sub_e[np.where(np.isinf(sub_e))] = 10*sub_e_max
     
-
+    sub_e = sub_e_orig.copy()
+    # Convert to molar quantities for display
+    idx = np.where(sub_e > 0)
+    nidx = np.where(sub_e <= 0)
+    sub_e[idx] = np.log10(sub_e[idx]/params['vol_grid']*1e12)
+    # set the other values to the min value
+    # sub_e[nidx] = np.min(sub_e[idx])-1
+    sub_e[nidx] = -20.0
+    sub_e_max = np.max(sub_e)
 
 
     # For the orange-blue color map
@@ -1287,7 +1314,7 @@ def plot_externalsub_treha(sub_e, yticks, yticklabels, curr_time, sub_e_max, plo
     plt.close(fig)
 # ----------------------------------------------------------------------------
 
-def plot_externalsub_treha_hyphae(sub_e, mycelia, num_total_segs, yticks, yticklabels, curr_time, sub_e_max, plot_type, folder_string, param_string, params, run):
+def plot_externalsub_treha_hyphae(sub_e_orig, mycelia, num_total_segs, yticks, yticklabels, curr_time, sub_e_max, plot_type, folder_string, param_string, params, run):
     """
     Parameters
     ----------
@@ -1314,11 +1341,16 @@ def plot_externalsub_treha_hyphae(sub_e, mycelia, num_total_segs, yticks, ytickl
 
     """
     # Convert to molar quantities for display
-    sub_e = np.log10(sub_e/params['vol_grid']*1e12) 
-    sub_e_max = np.max(sub_e[np.where(np.isfinite(sub_e))])
-
-    sub_e[np.where(np.isinf(sub_e))] = np.min(sub_e[np.where(np.isfinite(sub_e))])-1
-    #sub_e[np.where(np.isinf(sub_e))] = 10*sub_e_max
+    sub_e = sub_e_orig.copy()
+    idx = np.where(sub_e > 0)
+    nidx = np.where(sub_e <= 0)
+    sub_e[idx] = np.log10(sub_e[idx]/params['vol_grid']*1e12)
+    # set the other values to the min value
+    #if np.any(idx):
+    #    sub_e[nidx] = np.min(sub_e[idx])-1
+    #else:
+    sub_e[nidx] = -20.0 # set log concentration to -30.0
+    sub_e_max = np.max(sub_e)
     
 
 
@@ -1375,9 +1407,10 @@ def plot_externalsub_treha_hyphae(sub_e, mycelia, num_total_segs, yticks, ytickl
     ngrids = len(sub_e)
     max_xy = np.max(yticklabels)
 
-    si_conc = mycelia['treha_i']/mycelia['seg_vol'] *1.0e12
-    idx_to_display = np.intersect1d(np.where(mycelia['branch_id'][:num_total_segs]>-1)[0], np.where(np.isfinite(si_conc))[0])
-    si = si_conc[idx_to_display].flatten()
+    idx_to_display = np.where(mycelia['seg_vol'] > 0)[0]
+    si_conc = mycelia['treha_i'][idx_to_display]/mycelia['seg_vol'][idx_to_display] *1.0e12
+
+    si = si_conc.flatten()
     x1 = (mycelia['xy1'][idx_to_display, 0]*ngrids/2/max_xy + ngrids/2).tolist()
     x2 = (mycelia['xy2'][idx_to_display, 0]*ngrids/2/max_xy + ngrids/2).tolist()
     y1 = (mycelia['xy1'][idx_to_display, 1]*ngrids/2/max_xy + ngrids/2).tolist()
