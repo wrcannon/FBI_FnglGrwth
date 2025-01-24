@@ -151,6 +151,7 @@ def get_configs(config_filename):
         'init_sub_e_dist' : nutrient_params['init_sub_e_dist'],
         'init_sub_e_gluc' : nutrient_params.getfloat('init_sub_e_gluc')*vol_grid,
         'init_sub_e_treha' : nutrient_params.getfloat('init_sub_e_treha')*vol_grid,
+        'var_nutrient_backgrnd' : nutrient_params.getfloat('var_nutrient_backgrnd'),
         'diffusion_e_gluc' : diff_e_gluc,
         'convert_metabolite': convert_metabolite,
 
@@ -167,7 +168,7 @@ def get_configs(config_filename):
 
         #'kc1_gluc' : nutrient_params.getfloat('kc1_gluc'),
         #'Kc2_gluc' : nutrient_params.getfloat('Kc2_gluc'),
-        'kc1_gluc' : nutrient_params.getfloat('ku1_gluc'),
+        'kc1_gluc' : nutrient_params.getfloat('kc1_gluc'),
         'Kc2_gluc' : Ku2*init_vol_seg/vol_grid,
         'yield_c' : nutrient_params.getfloat('yield_c'),
 
@@ -330,6 +331,8 @@ def get_configs_new(config_filename):
         'init_sub_i_gluc' : nutrient_params.getfloat('init_sub_i_gluc'),
         'diffusion_i_gluc' : nutrient_params.getfloat('diffusion_i_gluc'),
         'vel_gluc' : nutrient_params.getfloat('vel_gluc'),
+        'var_nutrient_backgrnd' : nutrient_params.getfloat('var_nutrient_backgrnd'),
+        
         
         # 'm_gluc' : nutrient_params.getfloat('m_gluc'),
         # 'rho' : nutrient_params.getfloat('rho')*vol_seg,

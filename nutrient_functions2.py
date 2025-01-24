@@ -949,14 +949,14 @@ def uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd, time_step
     #                                                       gluc_i)
     # Ku2_gluc units are concentration in mmole/(micron)^ in parameters.ini
     # but are changed to units of mmole in helper_functions.get_configs()
-    # Since a hyphae is considered to live at a single grid point, the uptake 
-    # of glucose in the hyphae is from the grid at which the center of the hyphae
+    # Since a segment is considered to live at a single grid point, the uptake 
+    # of glucose in the segment is from the grid at which the center of the segment is located.
     #gluc_uptake = params['dt']*michaelis_menten(params['ku1_gluc'], 
     #                                              params['Ku2_gluc'], 
     #                                              gluc_e)
-    # Could use a different rate of uptake depending on the hyphal size,
+    # Could use a different rate of uptake depending on the segment size,
     # but I have not seen anyone indicate that the uptake rate is a function of cell/hyphae size.
-    # But this is probably the case
+    # But this is probably the case since glucose uptake receptors are on the cell surface.
     relative_seg_vol = mycelia['seg_vol'][:num_total_segs].flatten()/params['init_vol_seg']
     
     gluc_uptake = np.zeros(np.shape(relative_seg_vol))
@@ -986,6 +986,7 @@ def uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd, time_step
     # List of a list containing segment IDs, if inner list length > 1, the IDs are in same grid cell
     # That is, for each segment i mycelia['share_e'][i] lists the segment IDs that share the same grid cell with segment i (based on thier point of origin)
     my_share = mycelia['share_e'][:num_total_segs]
+    
 
     # Original amount taken up in each grid cell
     # really need a data structure that lists the segments that share each grid cell

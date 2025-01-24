@@ -47,7 +47,7 @@ try:
 except:
     print('failed to load parameters from command line')
     #params, config = hf.get_configs('parameters.ini')
-    params, config = hf.get_configs('parameters_env4_noFusion.ini')
+    params, config = hf.get_configs('parameters_env3_anastomosis0.25.ini')
 # Define string constants
 left ='LEFT'
 right = 'RIGHT'
@@ -95,9 +95,10 @@ def driver_singleNutrient(run):
     except: backDiff = 1
     print('backDiff : ', backDiff)
 
-    # Is the nutrient background variable or fixed?
+    # Is the nutrient background variable or fixed? If fixed, then the butrient concentration in the environment
+    # is fixed at the initial value. If variable, then the nutrient concentration in the environment is updated
     # variable = 1; fixed = 0
-    var_nutrient_backgrnd = backDiff
+    var_nutrient_backgrnd = params['var_nutrient_backgrnd']
     # We may/may not still want excreted compounds to diffuse, though
     if backDiff == 0:
         glucDiff = 0
@@ -185,9 +186,9 @@ def driver_singleNutrient(run):
     # breakpoint()
     # Set up external grid and glucose amounts in each cell
     if (isPatchyExtEnvironment == 0):
-        x_vals, y_vals, sub_e_gluc, sub_e_treha = sf.external_grid()
+        x_vals, y_vals, sub_e_gluc, sub_e_treha = sf.external_grid(params)
     else:
-        x_vals, y_vals, sub_e_gluc, sub_e_treha = sf.external_grid_patchy(setBackground, run+1)
+        x_vals, y_vals, sub_e_gluc, sub_e_treha = sf.external_grid_patchy(setBackground, params, run+1)
     
     folder_string, param_string = hf.get_filepath(params)
     # Create appropriate folder
@@ -241,7 +242,7 @@ def driver_singleNutrient(run):
     
     # Initialize mycelia dictionary
     # environ_type = 'control' or 'gm41'
-    mycelia = sf.mycelia_dict()
+    mycelia = sf.mycelia_dict(params)
     
     # Initialize time
     current_time = 0
@@ -249,9 +250,9 @@ def driver_singleNutrient(run):
     # Initial mycelia centered at origin
     num_segs = params['init_segs_count']
     if (whichInitialCondition == 1):
-        mycelia, num_branches, num_total_segs, dtt = sf.initial_conditions_line(mycelia, num_segs, x_vals, y_vals)
+        mycelia, num_branches, num_total_segs, dtt = sf.initial_conditions_line(mycelia, num_segs, x_vals, y_vals,params)
     elif (whichInitialCondition == 0):
-        mycelia, num_branches, num_total_segs, dtt = sf.initial_conditions_cross(mycelia, num_segs, x_vals, y_vals)
+        mycelia, num_branches, num_total_segs, dtt = sf.initial_conditions_cross(mycelia, num_segs, x_vals, y_vals, params)
     
     # ----------------------------------------------------------------------------
     # GROW THAT FUNGUS!
@@ -355,14 +356,14 @@ def driver_singleNutrient(run):
                 ##################################################################
                 # breakpoint()
                 tE_1 = time.time()
-                time_external += (tE_1 - tE_0)
+                time_external = (tE_1 - tE_0)
         
             # UPTAKE
             tU_0 = time.time()
             mycelia = nf.uptake(sub_e_gluc, mycelia, num_total_segs, var_nutrient_backgrnd, params['dt_e'],params)
             # mycelia = nf.uptake(sub_e_gluc, sub_e_treha, mycelia, num_total_segs, var_nutrient_backgrnd)
             tU_1 = time.time()
-            time_uptake += (tU_1 - tU_0)
+            time_uptake = (tU_1 - tU_0)
         # end while
         
         # RELEASE
@@ -382,7 +383,7 @@ def driver_singleNutrient(run):
                 breakpoint()
         
         tT_1 = time.time()
-        time_translocation += (tT_1 - tT_0)
+        time_translocation = (tT_1 - tT_0)
         
 
         
@@ -394,15 +395,15 @@ def driver_singleNutrient(run):
         mycelia, num_total_segs, dtt = gf.extension(mycelia, params, num_total_segs, 
                                         dtt, x_vals, y_vals,isCalibration, 
                                         dist2Tip_new, fungal_fusion,
-                                        chance_to_fuse, branch_rate)
-        if(np.any(np.isnan(mycelia['cw_i'][:num_total_segs]))):
-            breakpoint()
+                                        chance_to_fuse, branch_rate, sub_e_gluc)
+        #if(np.any(np.isnan(mycelia['cw_i'][:num_total_segs]))):
+        #    breakpoint()
         
-        if (old_num_total_segs > num_total_segs):
-           breakpoint()
+        #if (old_num_total_segs > num_total_segs):
+        #   breakpoint()
        
         tG_1 = time.time()
-        time_extend += (tG_1 - tG_0)
+        time_extend = (tG_1 - tG_0)
         
         # BRANCHING
         #if(num_total_segs > 9):
@@ -431,7 +432,7 @@ def driver_singleNutrient(run):
         tB_1 = time.time()
         if (np.isnan(np.sum(mycelia['cw_i'][:num_total_segs]))):
                 breakpoint()
-        time_branch += (tB_1 - tB_0)
+        time_branch = (tB_1 - tB_0)
             
         if current_step % (4*160) == 0: 
             if (np.isnan(np.sum(mycelia['cw_i'][:num_total_segs]))):
@@ -444,7 +445,14 @@ def driver_singleNutrient(run):
         #if(current_time > 24*3600*10):
         #    grd_density = sf.grid_density(mycelia, sub_e_gluc, num_total_segs) 
         #    print('Max grid density = ', np.max(grd_density))
-        
+
+        print('time_expternal: ',time_external)
+        print('time_uptake: ',time_uptake)
+        print('time_translocation: ',time_translocation)
+        print('time_extend: ',time_extend)
+        print('time_branch: ',time_branch)
+        #print('time_total: ',time_total)
+
         print_time = 2*3600*print_increment # print every 4 hours
         # PLOT & SAVE DATA
         if (current_time > print_time):

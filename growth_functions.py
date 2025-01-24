@@ -10,13 +10,24 @@ import numpy as np
 import helper_functions as hf
 import nutrient_functions2 as nf
 import random
-
-params, config = hf.get_configs('parameters.ini')
+import time
 
 
 # ----------------------------------------------------------------------------
 # GENERAL FUNCTIONS
 # ----------------------------------------------------------------------------
+
+def count_hyphae(mycelia, size, num_total_segments):
+    count = np.zeros((size,size),dtype=int)
+    for i in range(num_total_segments):
+        x,y = (mycelia['xy_e_idx'][i]).astype(int)
+        count[x,y] = count[x,y] +1
+    return count
+
+def count_hyphae2(mycelia, size, num_total_segments):
+    count = np.zeros((size,size),dtype=int)
+    [count[x,y]+1 for i in range(num_total_segments) for x,y in (mycelia['xy_e_idx'][i]).astype(int)] 
+    return count
 
 def michaelis_menten(k, K, s):
     """
@@ -103,6 +114,7 @@ def map_to_grid(mycelia, idx, num_total_segs, x_vals, y_vals):
     coordinates. Note if multiples segments are mapped to the same external grid
     point.
     """
+    t0 = time.time()
     # Include self in list of shared endpoints
     mycelia['share_e'][idx] = [idx]
     # Get the index of the external grid point
@@ -125,9 +137,58 @@ def map_to_grid(mycelia, idx, num_total_segs, x_vals, y_vals):
 
     return mycelia
 
+def map_to_grid2(mycelia, new_tips, num_total_segs, x_vals, y_vals):
+    """
+    Parameters
+    ----------
+    mycelia : dictionary
+        Stores structural information of mycelia colony for all hyphal segments.
+    idx : int
+        Segment index.
+    num_total_segs : int
+        Current total number of segments in the mycelium.
+    x_vals : list/array
+        The x-values of the external grid.
+    y_vals : list/array
+        The y-values of the external grid.
+
+    Returns
+    -------
+    mycelia : TYdictionaryPE
+        Updated structural information of mycelia colony for all hyphal segments.
+
+    Purpose
+    -------
+    Map the starting endpoint of a hyphal segment to the nearest external grid
+    coordinates. Note if multiples segments are mapped to the same external grid
+    point.
+    """
+    t0 = time.time()
+
+    # Include self in list of shared endpoints
+    for idx in new_tips:
+        mycelia['share_e'][idx] = [idx]
+        xy_e = np.array([int(np.argmin(abs(mycelia['xy1'][idx,0]-x_vals))),int(np.argmin(abs(mycelia['xy1'][idx,1]-y_vals)))])
+        if xy_e is None:
+            print('None value')
+        mycelia['xy_e_idx'][idx,:] = xy_e
+        # Check if another segments also maps to the same location
+        e_overlap = list(map(lambda x: np.array_equal(x, xy_e), mycelia['xy_e_idx'][:num_total_segs,:]))
+        
+        if any(e_overlap): # If there is overlap, append the segment index
+            #mycelia['share_e'][np.where(e_overlap)[0][0]].append(idx) # # Append the idx to the shared list for the overlapping indices
+            #mycelia['share_e'][idx].append(np.where(e_overlap)[0][0]) # Append the overlapping indices to the shared list for index idx
+            for i, val in enumerate(e_overlap):
+                if val:
+                    mycelia['share_e'][idx].append(i)
+                    mycelia['share_e'][i].append(idx)
+    t1 = time.time()
+    print('\tTime to map to grid2 : ', t1-t0)
+    return mycelia
+
 # ----------------------------------------------------------------------------
 
-def cost_of_growth(mycelia, idxs, grow_len):
+def cost_of_growth(mycelia, idxs, grow_len, params):
     """
     Parameters
     ----------
@@ -247,7 +308,7 @@ def cost_of_growth(mycelia, idxs, grow_len):
 
 # ----------------------------------------------------------------------------
 
-def update_structure(mycelia, idxs, grow_len, cost_grow_gluc, cost_grow_cw, isCalibration):
+def update_structure(mycelia, idxs, grow_len, cost_grow_gluc, cost_grow_cw, isCalibration,params):
     """
     Parameters
     ----------
@@ -394,7 +455,7 @@ def update_structure(mycelia, idxs, grow_len, cost_grow_gluc, cost_grow_cw, isCa
 #     return mycelia
 
 
-def septa_formation(mycelia, num_total_segs,branch_rate):
+def septa_formation(mycelia, num_total_segs,branch_rate, params):
     """
     Parameters
     ----------
@@ -505,7 +566,7 @@ def septa_formation(mycelia, num_total_segs,branch_rate):
 
 # ----------------------------------------------------------------------------
 
-def split_segment(mycelia, num_total_segs, x_vals, y_vals, isCalibration, dist2Tip_new):
+def split_segment(mycelia, num_total_segs, x_vals, y_vals, isCalibration, dist2Tip_new, params):
     """
     Parameters
     ----------
@@ -551,11 +612,14 @@ def split_segment(mycelia, num_total_segs, x_vals, y_vals, isCalibration, dist2T
     mycelia['seg_id'][new_tips] = mycelia['seg_id'][tips_to_split]+1
 
     # Update neighbor list
+    t0 = time.time()
     for idx, tip in enumerate(tips_to_split):
         mycelia['nbr_idxs'][tip].append(new_tips[idx])
         mycelia['nbr_idxs'][new_tips[idx]] = [tip]
     mycelia['nbr_num'][tips_to_split] += 1
     mycelia['nbr_num'][new_tips] += 1
+    t1 = time.time()
+    print('\tTime to update neighbor list : ', t1-t0)
 
     # Increase number of segments on branches that split
     num_total_segs += len(tips_to_split)
@@ -599,8 +663,13 @@ def split_segment(mycelia, num_total_segs, x_vals, y_vals, isCalibration, dist2T
     mycelia['dist_to_septa'][tips_to_split] = 0
 
     # Map to external grid
+    t0 = time.time()
     for tip_idx in new_tips:
         mycelia = map_to_grid(mycelia, tip_idx, num_total_segs, x_vals, y_vals)
+    t1 = time.time()
+    print('\tTime to map to grid : ', t1-t0)
+    mycelia = map_to_grid2(mycelia, new_tips, num_total_segs, x_vals, y_vals)
+
 
     # Update nutrient distribution
     # Percent of new growth compared to total
@@ -630,7 +699,7 @@ def split_segment(mycelia, num_total_segs, x_vals, y_vals, isCalibration, dist2T
 # Extension - Main function for elongation
 def extension(mycelia, params, num_total_segs, dtt, x_vals, y_vals, 
               isCalibration, dist2Tip_new, fungal_fusion,
-              chance_to_fuse,branch_rate):
+              chance_to_fuse,branch_rate, sub_e_gluc):
     """
     Parameters
     ----------
@@ -659,7 +728,7 @@ def extension(mycelia, params, num_total_segs, dtt, x_vals, y_vals,
     Driver function for elongation - determines which tips elongate, updates
     the structural information and checks for septation and segment splitting.
     """
-
+    t_init = time.time()
     tip_idxs = (np.where(mycelia['is_tip'])[0]).tolist()
     # Get the number density of segments around each segment 
     ndensity = [len(i) for i in mycelia['share_e'][:num_total_segs]]
@@ -670,15 +739,26 @@ def extension(mycelia, params, num_total_segs, dtt, x_vals, y_vals,
     #
     # Find those segments that have greater than half of their grid filled by other segments
     # But apply density filtering only after initial tips (ie, tip 3) have segmented
-    if 3 not in tip_idxs:
-        fidx = np.where(ndensity < np.int64(2)) # This is too sparse if the grid is large
-        #fidx = np.where(ndensity <= np.int64(params['dy']/params['hy_diam']*0.2)) 
-        #grid_area = (params['grid_len']*params['grid_len']*params['grid_height'])
+    # Limit hyphal growth by area of agar coverd by hyphae:
+    # Elise C. Hotz, Alexander J. Bradshaw, Casey Elliott, Krista Carlson, Bryn T.M. Dentinger, Steven E. Naleway,
+    # Effect of agar concentration on structure and physiology of fungal hyphal systems,
+    # Journal of Materials Research and Technology,
+    # Volume 24,2023, Pages 7614-7623, ISSN 2238-7854, https://doi.org/10.1016/j.jmrt.2023.05.013.
+    if 3 not in tip_idxs: # start checking density after the first 3 tips have segmented
+        # fidx = np.where(ndensity < np.int64(2)) # This is too sparse if the grid is large
+        nhyphae_grid = count_hyphae(mycelia, x_vals.size, num_total_segs)
+        #fidx = np.where(ndensity <= np.int64(params['dy']/params['hy_diam']*0.2)) # dy is grid length; hy_diam is hyphal diameter. 
+                                                                                   # So this is the number of hyphae that could be laid side-by-side 
+                                                                                   # across the grid; Then allow only 20% of that number
+        grid_area = (params['dy']*params['dy'])
+        hyphal_area_grid = params['hy_diam']*params['dy']*nhyphae_grid # hyphal length is assume to span the grid of length dy.
         #scale = 1.0e06/grid_area # convert from square microns to square millimeters
         #scaled_density = ndensity*scale
-        #fidx = np.where(scaled_density >= params['max_hyphal_density'])
+        #fidx = np.where(scaled_density >= params['max_hyphal_density_per_mm2'])
+        fidx = [idx for idx in tip_idxs if hyphal_area_grid[tuple((mycelia['xy_e_idx'][idx]).astype(int))] < 0.501*grid_area]
+        #fidx = np.where(hyphal_area_grid <= 0.5*grid_area)
         # Don't allow segments in high density regions to grow
-        #tip_idxs = list(set(tip_idxs) & set(fidx[0]))
+        tip_idxs = list(set(tip_idxs) & set(fidx))
 
     # Check to see if the list is empty, and if so, return
     if not tip_idxs:
@@ -694,17 +774,25 @@ def extension(mycelia, params, num_total_segs, dtt, x_vals, y_vals,
     if any(extend_len > 1e2):
         breakpoint()
     # Cost to grow predetermined amount or shorten if cost is too much
-    extend_len, cost_grow_gluc, cost_grow_cw = cost_of_growth(mycelia, np.array(tip_idxs), extend_len)
+    t0 = time.time()
+    extend_len, cost_grow_gluc, cost_grow_cw = cost_of_growth(mycelia, np.array(tip_idxs), extend_len, params)
+    t1 = time.time()
+    print('\tcost_of_growth time : ', t1-t0)
     if(np.shape(mycelia['cw_i'][tip_idxs]) != np.shape(cost_grow_cw)):
         breakpoint()
     if any(extend_len > 1e2):
         breakpoint()
     # If nutrient to extend, update tip
+    t_int = time.time()
+    print('\tTime intermediate : ', t_int-t_init)
     if max(extend_len) > 0:
 
         # New endpoint update and concentration update
         # print(tip_idxs, extend_len, cost_grow_gluc, cost_grow_cw)
-        mycelia = update_structure(mycelia, tip_idxs, extend_len, cost_grow_gluc, cost_grow_cw, isCalibration)
+        t0 = time.time()
+        mycelia = update_structure(mycelia, tip_idxs, extend_len, cost_grow_gluc, cost_grow_cw, isCalibration,params)
+        t1 = time.time()
+        print('\tupdate_structure time : ', t1-t0)
         # if(np.any(np.isnan(mycelia['cw_i']))):
         #     xx = np.where(np.isnan(mycelia['cw_i']))
         #     mycelia['cw_i'][xx] = 0.0
@@ -714,7 +802,7 @@ def extension(mycelia, params, num_total_segs, dtt, x_vals, y_vals,
         # Check for fusion
         if (fungal_fusion == 1):
             for idx in tip_idxs:
-                mycelia = anastomosis(mycelia, idx, num_total_segs, chance_to_fuse)
+                mycelia = anastomosis(mycelia, idx, num_total_segs, chance_to_fuse, sub_e_gluc, params)
             if(np.any(np.isnan(mycelia['cw_i']))):
                 breakpoint()
 ##############################################################################
@@ -724,22 +812,32 @@ def extension(mycelia, params, num_total_segs, dtt, x_vals, y_vals,
         nn = 3
         #if max(mycelia['dist_to_septa']) > 3*params['sl']*params['septa_len']:
         if max(mycelia['dist_to_septa']) > nn*params['sl']*params['septa_len']:
-            mycelia = septa_formation(mycelia, num_total_segs, branch_rate)
+            t0 = time.time()
+            mycelia = septa_formation(mycelia, num_total_segs, branch_rate, params)
+            t1 = time.time()
+            print('\tsepta_formation time : ', t1-t0)
             # print('Septa formation from 3x length')
         # if(np.any(np.isnan(mycelia['cw_i']))):
         #     breakpoint()
         # Check if any tip segment splits
         if max(mycelia['seg_length'][tip_idxs] > (nn-1)*params['sl']):
-            mycelia, num_total_segs, dtt = split_segment(mycelia, num_total_segs, x_vals, y_vals, isCalibration, dist2Tip_new)
+            t0 = time.time()
+            mycelia, num_total_segs, dtt = split_segment(mycelia, num_total_segs, x_vals, y_vals, isCalibration, dist2Tip_new, params)
+            t1 = time.time()
+            print('\tsplit_segment time : ', t1-t0)
             # print('Septa formation from 2x length')
         # if(np.any(np.isnan(mycelia['cw_i']))):
         #     breakpoint()
+        t_end = time.time()
+        print('\tTime intermediate 2 : ', t_int-t_init)
+        print('\tTime to extend : ', t_end-t_init)
     return mycelia, num_total_segs, dtt
 
 # ----------------------------------------------------------------------------
 
 def extend_mycelia(mycelia):
 
+    t0 = time.time()
     max_total_segs = np.shape(mycelia['cw_i'])[0]
     new_max_total_segs = np.int64(max(np.shape(mycelia['cw_i']))*2)
 
@@ -818,7 +916,8 @@ def extend_mycelia(mycelia):
     new_array = np.resize(mycelia['dist_from_center'],(new_max_total_segs,1))
     new_array[max_total_segs:] = 0
     mycelia['dist_from_center'] = new_array
-
+    t1 = time.time()
+    print('\tTime to extend mycelia : ', t1-t0)
     return mycelia
 
 # Branching - Main function for new branches
@@ -922,7 +1021,7 @@ def branching(mycelia, sub_e_gluc, params, num_total_segs, dtt, x_vals, y_vals,
         branch_len0 = np.ones((len(potential_branch_idxs),1))*len0
 
         # Does this ensure that a branch length is only as long as the available nutrients allow? But after ensuring tip growth?
-        branch_len, cost_branch_gluc, cost_branch_cw = cost_of_growth(mycelia, np.array(potential_branch_idxs), branch_len0)
+        branch_len, cost_branch_gluc, cost_branch_cw = cost_of_growth(mycelia, np.array(potential_branch_idxs), branch_len0,params)
         # prob = 1.0 - np.exp(-(mycelia['cw_i'][potential_branch_idxs] - cost_multiple*cost_branch_cw)/(cost_multiple*cost_branch_cw))
         #prob = np.exp((branch_len-1*branch_len0)/branch_len0)
 
@@ -982,7 +1081,7 @@ def branching(mycelia, sub_e_gluc, params, num_total_segs, dtt, x_vals, y_vals,
             angle_sign = np.sign(np.random.uniform(-1,1,np.shape(mycelia['angle'][true_branch_ids])))
             mycelia['angle'][new_tips] = mycelia['angle'][true_branch_ids] + angle_sign*np.random.normal(params['branch_mean'], params['branch_sd'], np.shape(mycelia['angle'][true_branch_ids]))
             zero_cost = np.zeros(np.shape(cost_branch_cw))
-            mycelia = update_structure(mycelia, new_tips, branch_len, zero_cost, zero_cost, isCalibration)
+            mycelia = update_structure(mycelia, new_tips, branch_len, zero_cost, zero_cost, isCalibration,params)
 
             # breakpoint()
             # Designate new tip as a tip and set originating banch to can't branch
@@ -990,9 +1089,10 @@ def branching(mycelia, sub_e_gluc, params, num_total_segs, dtt, x_vals, y_vals,
             mycelia['is_tip'][new_tips] = True
 
             # Map to external grid
-            for tip_idx in new_tips:
-                mycelia = map_to_grid(mycelia, tip_idx, num_total_segs, x_vals, y_vals)
-
+            #for tip_idx in new_tips:
+            #    mycelia = map_to_grid(mycelia, tip_idx, num_total_segs, x_vals, y_vals)
+            mycelia = map_to_grid2(mycelia, new_tips, num_total_segs, x_vals, y_vals)
+            
             # Update nutrient distribution
             # Percent of new growth compared to total
             perct_new_size = branch_len/(branch_len + mycelia['seg_length'][true_branch_ids])
@@ -1009,7 +1109,7 @@ def branching(mycelia, sub_e_gluc, params, num_total_segs, dtt, x_vals, y_vals,
             
             if fungal_fusion == 1:
                 for idx in new_tips:
-                    mycelia = anastomosis(mycelia, idx, num_total_segs, chance_to_fuse)
+                    mycelia = anastomosis(mycelia, idx, num_total_segs, chance_to_fuse, sub_e_gluc, params)
 
             # Update distance to tip
             if dist2Tip_new == 1:
@@ -1233,7 +1333,7 @@ def branching(mycelia, sub_e_gluc, params, num_total_segs, dtt, x_vals, y_vals,
 
 # ----------------------------------------------------------------------------
 
-def anastomosis(mycelia, idx, num_total_segs, chance_to_fuse):
+def anastomosis(mycelia, idx, num_total_segs, chance_to_fuse, sub_e_gluc, params):
     """
     Parameters
     ----------
@@ -1253,6 +1353,15 @@ def anastomosis(mycelia, idx, num_total_segs, chance_to_fuse):
     -------
     Checks if segment idx fuses with another segment and updates accordingly
     """
+    # x,y indicies of external grid used for each segment
+    xy_e_idx_og = mycelia['xy_e_idx'][idx].astype(int)
+    # breakpoint()
+    # Reformat indicies
+    xy_e_idx = tuple(np.transpose(xy_e_idx_og))
+    
+    # Glucose mmole values at grid points, not mMolar!
+    gluc_e = sub_e_gluc[xy_e_idx] # this is a slice, not copy; gluc_e contains, for each segment, the amount of glucose in the grid cell where each hyphae is located
+
 
     # Endpoints of current hyphal segment
     xy1_c = mycelia['xy1'][idx,:]
@@ -1268,6 +1377,7 @@ def anastomosis(mycelia, idx, num_total_segs, chance_to_fuse):
     seg_nbrs = mycelia['nbr_idxs'][idx]
 
     # Combined list of neighbors & segments on branch
+    # Don't fuse with a segment on the same branch.
     skip_ids = np.unique(np.concatenate((segs_on_branch, seg_nbrs)))
 
     # Define the zone to look for interactions in
@@ -1323,11 +1433,16 @@ def anastomosis(mycelia, idx, num_total_segs, chance_to_fuse):
                         # print('Something is wrong')
                         continue
                         # breakpoint()
-                   
-                    prob = np.random.uniform(0, 1, 1)
-                    if (prob > chance_to_fuse):
-                        # print('Intersection found but fails probability check!')
+                    #### test fusion probability based on external glucose concentration:
+                    # chance2fuse = 1.0 - michaelis_menten(1.0, params['Ku2_gluc']/mycelia['seg_vol'][target_idx], mycelia['gluc_i'][target_idx])
+                    chance2fuse = 1.0 - michaelis_menten(1.0, params['Ku2_gluc']/params['vol_grid'], gluc_e)
+                    #####
+                    rand_chance = np.random.uniform(0, 1, 1)
+                    if (rand_chance > chance_to_fuse):
                         continue
+                    #if (chance2fuse < rand_chance):
+                    #    # print('Intersection found but fails probability check!')
+                    #    continue
                     # else:
                          # print('Intersection found')
                     # If the intersection is with a bypassed segment, the intersection

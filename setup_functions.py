@@ -13,13 +13,11 @@ import nutrient_functions2 as nf
 import growth_functions as gf
 import math 
 
-params, config = hf.get_configs('parameters.ini')
-
 # ----------------------------------------------------------------------------
 # SET UP FUNCTIONS
 # ----------------------------------------------------------------------------
 
-def mycelia_dict():
+def mycelia_dict(params):
     """
     Returns
     -------
@@ -84,7 +82,7 @@ def mycelia_dict():
         'seg_length': np.zeros((max_total_segs, 1)),
         'seg_vol': np.zeros((max_total_segs, 1)),
         'dist_to_septa': np.zeros((max_total_segs, 1)),
-        'xy_e_idx': np.zeros((max_total_segs, 2)),
+        'xy_e_idx': np.zeros((max_total_segs, 2),dtype=int),
         'share_e': [None]*max_total_segs,
         'cw_i': np.zeros((max_total_segs, 1)),
         'gluc_i': np.zeros((max_total_segs, 1)),
@@ -105,7 +103,7 @@ def mycelia_dict():
 
 # ----------------------------------------------------------------------------
 
-def initial_conditions_cross(mycelia, num_segs, x_vals, y_vals):
+def initial_conditions_cross(mycelia, num_segs, x_vals, y_vals, params):
     
     # Initial mycelia centered at origin with line segments of same length extending from it
     # num_branches = 2
@@ -206,7 +204,7 @@ def initial_conditions_cross(mycelia, num_segs, x_vals, y_vals):
             
     return mycelia, num_branches, num_total_segs, dtt
 
-def initial_conditions_line(mycelia, num_segs, x_vals, y_vals):
+def initial_conditions_line(mycelia, num_segs, x_vals, y_vals,params):
     
     # Initial mycelia centered at origin with line segments of same length extending from it
     num_branches = 2
@@ -263,7 +261,7 @@ def initial_conditions_line(mycelia, num_segs, x_vals, y_vals):
     mycelia['seg_vol'] =     mycelia['seg_length']*params['cross_area']
     
     # Concentration of glucose in 0th segment of each branch
-    # mycelia['gluc_i'][:num_branches] = params['init_sub_i_gluc']*params['cross_area']*params['sl']
+    # mycelia['gluc_i'][:num_branches] = k['init_sub_i_gluc']*params['cross_area']*params['sl']
     # All initial segments have the same concentration
     mycelia['gluc_i'][:num_total_segs] = params['init_sub_i_gluc']*params['cross_area']*params['sl']
     
@@ -344,7 +342,7 @@ def external_grid():
 
 ##############################################################################
 
-def external_grid_patchy(set,seed=6):
+def external_grid_patchy(set,params, seed=6):
     # Define external domain grid
     scale_val = params['grid_scale_val']
     # Number of grid x points = 2*params['sl']*scale_val/params['dy'] + 1:
@@ -538,6 +536,7 @@ def grid_density(mycelia, sub_e_gluc, num_total_segments):
         tpl = tuple(np.int_(mycelia['xy_e_idx'][i]))
         count[tpl] = count[tpl] +1
     return count
+
 
             
             
